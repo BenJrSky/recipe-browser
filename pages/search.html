@@ -118,7 +118,7 @@
         </div>
     </div>
 
-    <div @if="loading" class="loading">Searching...</div>
+    <div @if="loading && !searchResultsData.meals" class="loading">Searching...</div>
     <div @if="!loading && searchResultsData?.meals && searchResultsData?.meals.length === 0 && (searchQuery || searchIngredient || searchArea || searchLetter)"
         class="error">
         No recipes found. Try other search terms.

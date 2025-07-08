@@ -46,58 +46,58 @@ This tutorial will teach you how to:
 - Caching and performance optimization
 - Async/await patterns with Ayisha.js
 
-## �️ **Setup del Progetto**
+## ⚡️ **Project Setup**
 
-### **Prerequisiti**
+### **Prerequisites**
 ```bash
-# Nessuna installazione richiesta! 
-# Ayisha.js è incluso nel progetto come file singolo
+# No installation required! 
+# Ayisha.js is included in the project as a single file
 ```
 
-### **Avvio Rapido**
+### **Quick Start**
 ```bash
-# 1. Clona il repository
+# 1. Clone the repository
 git clone [repository-url]
 cd recipe-browser
 
-# 2. Apri in un server locale (raccomandato)
-# Opzione A: Python
+# 2. Open in a local server (recommended)
+# Option A: Python
 python -m http.server 8000
 
-# Opzione B: Node.js live-server
+# Option B: Node.js live-server
 npx live-server
 
-# Opzione C: VS Code Live Server extension
+# Option C: VS Code Live Server extension
 
-# 3. Naviga a http://localhost:8000
+# 3. Navigate to http://localhost:8000
 ```
 
-### **Struttura del Tutorial**
+### **Tutorial Structure**
 ```
 recipe-browser/
-├── index.html                 # 📄 Entry point principale con setup Ayisha.js
-├── ayisha-1.0.1.js           # 🚀 Framework Ayisha.js
-├── styles.css                # 🎨 Stili globali e design system
-├── components/               # 🧩 Componenti riutilizzabili
-│   ├── header.html          #   - Header con logo e branding
-│   ├── nav.html             #   - Navigazione principale SPA
-│   ├── search-section.html  #   - Sezione ricerca avanzata
-│   └── footer.html          #   - Footer con link e info
-├── pages/                    # 📱 Pagine dell'applicazione
-│   ├── home.html            #   - Homepage con ricerche rapide
-│   ├── categories.html      #   - Lista categorie ricette  
-│   ├── category-meals.html  #   - Ricette per categoria
-│   ├── search.html          #   - Ricerca avanzata
-│   ├── random.html          #   - Ricette casuali
-│   └── recipe-detail.html   #   - Dettaglio singola ricetta
-└── README.md                # 📖 Questa guida tutorial
+├── index.html                 # 📄 Main entry point with Ayisha.js setup
+├── ayisha-1.0.1.js           # 🚀 Ayisha.js Framework
+├── styles.css                # 🎨 Global styles and design system
+├── components/               # 🧩 Reusable components
+│   ├── header.html          #   - Header with logo and branding
+│   ├── nav.html             #   - Main SPA navigation
+│   ├── search-section.html  #   - Advanced search section
+│   └── footer.html          #   - Footer with links and info
+├── pages/                    # 📱 Application pages
+│   ├── home.html            #   - Homepage with quick searches
+│   ├── categories.html      #   - Recipe categories list  
+│   ├── category-meals.html  #   - Recipes by category
+│   ├── search.html          #   - Advanced search
+│   ├── random.html          #   - Random recipes
+│   └── recipe-detail.html   #   - Single recipe detail
+└── README.md                # 📖 This tutorial guide
 ```
 
-## 📖 **Guida Tutorial Passo-Passo**
+## 📖 **Step-by-Step Tutorial Guide**
 
-### **Livello 1: Fondamenti Ayisha.js** 🟢
+### **Level 1: Ayisha.js Fundamentals** 🟢
 
-#### **1.1 Inizializzazione dello Stato**
+#### **1.1 State Initialization**
 ```html
 <!-- index.html -->
 <init>
@@ -110,79 +110,79 @@ recipe-browser/
 </init>
 ```
 
-**📝 Cosa impari:**
-- Come inizializzare lo stato globale con `<init>`
-- Convenzioni di naming per variabili di stato
-- Setup base di un'applicazione Ayisha.js
+**📝 What you'll learn:**
+- How to initialize global state with `<init>`
+- Naming conventions for state variables
+- Basic setup of an Ayisha.js application
 
-#### **1.2 Routing SPA di Base**
+#### **1.2 Basic SPA Routing**
 ```html
-<!-- Navigazione -->
+<!-- Navigation -->
 <nav>
     <a @link="home">Home</a>
-    <a @link="categories">Categorie</a>
-    <a @link="search">Cerca</a>
+    <a @link="categories">Categories</a>
+    <a @link="search">Search</a>
 </nav>
 
-<!-- Pagine condizionali -->
+<!-- Conditional pages -->
 <component @src="./pages/home.html" @page="home"></component>
 <component @src="./pages/categories.html" @page="categories"></component>
 ```
 
-**📝 Cosa impari:**
-- Direttiva `@link` per la navigazione
-- Direttiva `@page` per il rendering condizionale delle pagine
-- Sistema di routing dichiarativo
+**📝 What you'll learn:**
+- `@link` directive for navigation
+- `@page` directive for conditional page rendering
+- Declarative routing system
 
-#### **1.3 Componenti Esterni**
+#### **1.3 External Components**
 ```html
-<!-- Caricamento componenti esterni -->
+<!-- Loading external components -->
 <component @src="./components/header.html"></component>
 <component @src="./components/nav.html"></component>
 ```
 
-**📝 Cosa impari:**
-- Come strutturare un'app in componenti modulari
-- Caricamento dinamico di template HTML esterni
-- Architettura component-based
+**📝 What you'll learn:**
+- How to structure an app with modular components
+- Dynamic loading of external HTML templates
+- Component-based architecture
 
-### **Livello 2: Gestione Stato e Eventi** 🟡
+### **Level 2: State Management and Events** 🟡
 
 #### **2.1 Two-Way Data Binding**
 ```html
 <!-- components/search-section.html -->
 <input @model="quickSearch" 
-       placeholder="Cerca ricette...">
-<div>Stai cercando: {{quickSearch}}</div>
+       placeholder="Search recipes...">
+<div>You're searching for: {{quickSearch}}</div>
 ```
 
-**📝 Cosa impari:**
-- Direttiva `@model` per binding bidirezionale
-- Interpolazione template con `{{}}` 
-- Reattività automatica dello stato
+**📝 What you'll learn:**
+- `@model` directive for bidirectional binding
+- Template interpolation with `{{}}` 
+- Automatic state reactivity
 
-#### **2.2 Event Handling e API Calls**
+#### **2.2 Event Handling and API Calls**
 ```html
-<!-- Bottone con chiamata API -->
+<!-- Button with API call -->
 <button @click="
     loading = true; 
     error = ''
 " @fetch:click="'https://www.themealdb.com/api/json/v1/1/random.php'"
    @result="randomMeal">
-    Ricetta Casuale
+    Random Recipe
 </button>
 
-<!-- Gestione loading state -->
-<div @if="loading">Caricamento...</div>
-<div @if="error">Errore: {{error}}</div>
+<!-- Loading state handling -->
+<div @if="loading">Loading...</div>
+<div @if="error">Error: {{error}}</div>
 ```
 
-**📝 Cosa impari:**
-- Combinare `@click` con `@fetch` per API calls
-- Gestione di loading states e errori
-- Pattern comune per UX asincrona
+**📝 What you'll learn:**
+- Combining `@click` with `@fetch` for API calls
+- Managing loading states and errors
+- Common patterns for async UX
 
-#### **2.3 Iterazione e Rendering Liste**
+#### **2.3 Iteration and List Rendering**
 ```html
 <!-- pages/categories.html -->
 <div @fetch="'https://www.themealdb.com/api/json/v1/1/categories.php'" 
@@ -198,26 +198,26 @@ recipe-browser/
         <button @click="
             selectedCategory = category.strCategory;
             currentPage = 'category-meals'
-        ">Visualizza Ricette</button>
+        ">View Recipes</button>
     </div>
 </div>
 ```
 
-**📝 Cosa impari:**
-- Direttiva `@for` per iterare array
-- Accesso a proprietà di oggetti nell'interpolazione  
-- Passaggio di dati tra pagine tramite stato
+**📝 What you'll learn:**
+- `@for` directive for iterating arrays
+- Accessing object properties in interpolation  
+- Passing data between pages via state
 
-### **Livello 3: Funzionalità Avanzate** 🔴
+### **Level 3: Advanced Features** 🔴
 
-#### **3.1 Ricerca Avanzata con Filtri**
+#### **3.1 Advanced Search with Filters**
 ```html
 <!-- pages/search.html -->
 <div class="search-filters">
     <select @model="searchType">
-        <option value="name">Per Nome</option>
-        <option value="ingredient">Per Ingrediente</option>
-        <option value="area">Per Area</option>
+        <option value="name">By Name</option>
+        <option value="ingredient">By Ingredient</option>
+        <option value="area">By Area</option>
     </select>
     
     <input @model="searchQuery" 
@@ -227,20 +227,20 @@ recipe-browser/
                }
            ">
     
-    <button @click="performSearch()">Cerca</button>
+    <button @click="performSearch()">Search</button>
 </div>
 
-<!-- URL dinamico basato sui filtri -->
+<!-- Dynamic URL based on filters -->
 <div @fetch="searchUrl" @result="searchResults" @if="searchQuery.length > 2">
 </div>
 ```
 
-**📝 Cosa impari:**
-- Computed properties per URL dinamici
-- Gestione form complessi con multiple opzioni
-- Ricerca in tempo reale con debouncing
+**📝 What you'll learn:**
+- Computed properties for dynamic URLs
+- Complex form handling with multiple options
+- Real-time search with debouncing
 
-#### **3.2 Gestione Stato Complesso**
+#### **3.2 Complex State Management**
 ```html
 <!-- pages/recipe-detail.html -->
 <div @fetch="'https://www.themealdb.com/api/json/v1/1/lookup.php?i=' + selectedMealId" 
@@ -252,7 +252,7 @@ recipe-browser/
         <h1>{{recipe.strMeal}}</h1>
         <img src="{{recipe.strMealThumb}}" alt="{{recipe.strMeal}}">
         
-        <!-- Ingredienti dinamici -->
+        <!-- Dynamic ingredients -->
         <ul class="ingredients">
             <li @if="recipe.strIngredient1">
                 {{recipe.strMeasure1}} {{recipe.strIngredient1}}
@@ -260,10 +260,10 @@ recipe-browser/
             <li @if="recipe.strIngredient2">
                 {{recipe.strMeasure2}} {{recipe.strIngredient2}}
             </li>
-            <!-- ... fino a 20 ingredienti -->
+            <!-- ... up to 20 ingredients -->
         </ul>
         
-        <!-- Istruzioni formattate -->
+        <!-- Formatted instructions -->
         <div class="instructions">
             {{recipe.strInstructions}}
         </div>
@@ -271,37 +271,37 @@ recipe-browser/
 </div>
 ```
 
-**📝 Cosa impari:**
-- Navigazione profonda negli oggetti di stato
-- Rendering condizionale basato su dati API
-- Gestione di strutture dati complesse
+**📝 What you'll learn:**
+- Deep navigation in state objects
+- Conditional rendering based on API data
+- Handling complex data structures
 
-### **Livello 4: Ottimizzazioni e Best Practices** ⚡
+### **Level 4: Optimizations and Best Practices** ⚡
 
-#### **4.1 Performance e UX**
+#### **4.1 Performance and UX**
 ```html
-<!-- Loading states sofisticati -->
+<!-- Sophisticated loading states -->
 <div @if="loading" class="loading-skeleton">
     <div class="skeleton-card"></div>
     <div class="skeleton-card"></div>
     <div class="skeleton-card"></div>
 </div>
 
-<!-- Error handling user-friendly -->
+<!-- User-friendly error handling -->
 <div @if="error" class="error-message">
-    <h3>Oops! Qualcosa è andato storto</h3>
+    <h3>Oops! Something went wrong</h3>
     <p>{{error}}</p>
     <button @click="
         error = '';
         loading = false;
         /* retry logic */
-    ">Riprova</button>
+    ">Try Again</button>
 </div>
 ```
 
-#### **4.2 Responsive Design con Ayisha.js**
+#### **4.2 Responsive Design with Ayisha.js**
 ```html
-<!-- Adaptive UI basata su stato -->
+<!-- Adaptive UI based on state -->
 <div class="layout" 
      @class="{
          'mobile-layout': screenSize === 'mobile',
@@ -310,7 +310,7 @@ recipe-browser/
      }">
 </div>
 
-<!-- Menu mobile toggle -->
+<!-- Mobile menu toggle -->
 <button @click="mobileMenuOpen = !mobileMenuOpen" 
         class="mobile-toggle">☰</button>
 <nav @class="{'nav-open': mobileMenuOpen}">
@@ -318,72 +318,72 @@ recipe-browser/
 </nav>
 ```
 
-## 🎓 **Esercizi Pratici**
+## 🎓 **Practical Exercises**
 
-### **Esercizio 1: Aggiungi una Nuova Pagina** 
-Crea una pagina "Preferiti" che:
-- Mostri ricette salvate in localStorage
-- Permetta di aggiungere/rimuovere ricette
-- Utilizzi `@click` e `@if` per la gestione
+### **Exercise 1: Add a New Page** 
+Create a "Favorites" page that:
+- Shows recipes saved in localStorage
+- Allows adding/removing recipes
+- Uses `@click` and `@if` for management
 
-### **Esercizio 2: Migliora la Ricerca**
-Estendi la funzionalità di ricerca per:
-- Aggiungere ricerca per prima lettera
-- Implementare suggerimenti automatici
-- Aggiungere filtri combinati
+### **Exercise 2: Improve Search**
+Extend search functionality to:
+- Add search by first letter
+- Implement autocomplete suggestions
+- Add combined filters
 
-### **Esercizio 3: Componente Personalizzato**
-Crea un componente `recipe-card.html` che:
-- Sia riutilizzabile in più pagine
-- Accetti parametri tramite attributi
-- Includa azioni (visualizza, salva, condividi)
+### **Exercise 3: Custom Component**
+Create a `recipe-card.html` component that:
+- Is reusable across multiple pages
+- Accepts parameters via attributes
+- Includes actions (view, save, share)
 
-## 💡 **Concetti Chiave Dimostrati**
+## 💡 **Key Concepts Demonstrated**
 
-### **🔄 Reattività**
+### **🔄 Reactivity**
 ```javascript
-// Lo stato è automaticamente reattivo
-currentPage = 'search';           // Cambia la pagina istantaneamente
-searchResults = newResults;       // Aggiorna la UI automaticamente
-loading = false;                  // Nasconde i loading state
+// State is automatically reactive
+currentPage = 'search';           // Changes page instantly
+searchResults = newResults;       // Updates UI automatically
+loading = false;                  // Hides loading states
 ```
 
 ### **🎯 Event-Driven Programming**
 ```html
-<!-- Catena di eventi coordinati -->
+<!-- Coordinated event chain -->
 <button @click="
     loading = true;
     error = '';
     selectedCategory = ''
 " @fetch:click="apiUrl" 
    @result="results">
-    Carica Dati
+    Load Data
 </button>
 ```
 
-### **🧩 Composizione Componenti**
+### **🧩 Component Composition**
 ```html
-<!-- App composta da componenti modulari -->
+<!-- App composed of modular components -->
 <component @src="./components/header.html"></component>
 <component @src="./pages/home.html" @page="home"></component>
 <component @src="./components/footer.html"></component>
 ```
 
-## 🏗️ **Architettura dell'App**
+## 🏗️ **App Architecture**
 
-### **Pattern Utilizzati**
-- **Component-Based Architecture**: UI divisa in componenti riutilizzabili
-- **Single Source of Truth**: Stato centralizzato nell'`<init>` block
-- **Unidirectional Data Flow**: Dati fluiscono dall'alto verso il basso
-- **Event-Driven Updates**: Modifiche tramite eventi user e API responses
+### **Patterns Used**
+- **Component-Based Architecture**: UI divided into reusable components
+- **Single Source of Truth**: Centralized state in `<init>` block
+- **Unidirectional Data Flow**: Data flows from top to bottom
+- **Event-Driven Updates**: Changes via user events and API responses
 
-### **Gestione dello Stato**
+### **State Management**
 ```html
 <init>
     // 🌐 Navigation state
     currentPage = 'home';
     
-    // � Search state  
+    // 🔍 Search state  
     quickSearch = '';
     searchQuery = '';
     searchType = 'name';
@@ -393,42 +393,42 @@ loading = false;                  // Nasconde i loading state
     searchResults = [];
     currentRecipe = null;
     
-    // � UI state
+    // 🎨 UI state
     loading = false;
     error = '';
     mobileMenuOpen = false;
 </init>
 ```
 
-## � **API Integration con Ayisha.js**
+## 🌐 **API Integration with Ayisha.js**
 
 ### **TheMealDB API Endpoints**
 ```javascript
-// 🎲 Ricetta casuale
+// 🎲 Random recipe
 'https://www.themealdb.com/api/json/v1/1/random.php'
 
-// 📋 Lista categorie  
+// 📋 Categories list  
 'https://www.themealdb.com/api/json/v1/1/categories.php'
 
-// 🔍 Ricerca per nome
+// 🔍 Search by name
 'https://www.themealdb.com/api/json/v1/1/search.php?s=' + searchQuery
 
-// 📖 Dettagli ricetta
+// 📖 Recipe details
 'https://www.themealdb.com/api/json/v1/1/lookup.php?i=' + mealId
 
-// 🏷️ Ricette per categoria
+// 🏷️ Recipes by category
 'https://www.themealdb.com/api/json/v1/1/filter.php?c=' + category
 ```
 
-### **Pattern @fetch + @result**
+### **@fetch + @result Pattern**
 ```html
-<!-- Pattern base per chiamate API -->
+<!-- Basic pattern for API calls -->
 <div @fetch="apiUrl" 
      @result="targetVariable"
      @if="shouldFetch">
      
     <!-- Loading state -->
-    <div @if="loading">Caricamento...</div>
+    <div @if="loading">Loading...</div>
     
     <!-- Success state -->
     <div @if="targetVariable && !loading">
@@ -438,129 +438,128 @@ loading = false;                  // Nasconde i loading state
     </div>
     
     <!-- Error state -->
-    <div @if="error">Errore: {{error}}</div>
+    <div @if="error">Error: {{error}}</div>
 </div>
 ```
 
-## 🎯 **Obiettivi di Apprendimento Raggiunti**
+## 🎯 **Learning Objectives Achieved**
 
-Completando questo tutorial, avrai imparato:
+By completing this tutorial, you will have learned:
 
-✅ **Fondamenti Ayisha.js**
-- Setup e inizializzazione di un progetto
-- Gestione dello stato reattivo
-- Sistema di routing SPA
+✅ **Ayisha.js Fundamentals**
+- Project setup and initialization
+- Reactive state management
+- SPA routing system
 
-✅ **Componenti e Architettura**  
-- Creazione di componenti riutilizzabili
-- Caricamento dinamico di template esterni
-- Organizzazione modulare del codice
+✅ **Components and Architecture**  
+- Creating reusable components
+- Dynamic external template loading
+- Modular code organization
 
 ✅ **API Integration**
-- Chiamate HTTP asincrone con @fetch
-- Gestione di loading states e errori
-- Pattern per UX ottimale
+- Asynchronous HTTP calls with @fetch
+- Loading states and error handling
+- Patterns for optimal UX
 
 ✅ **Advanced Patterns**
-- Event handling complesso
-- Form dinamici e validazione
-- Responsive design con stato reattivo
+- Complex event handling
+- Dynamic forms and validation
+- Responsive design with reactive state
 
-## 🚀 **Prossimi Passi**
+## 🚀 **Next Steps**
 
-### **Estendere il Progetto**
-1. **Aggiungi Preferiti**: Sistema di salvataggio ricette con localStorage
-2. **Migliora UX**: Implementa ricerca predictive e autocomplete  
-3. **PWA Features**: Rendi l'app installabile e funzionante offline
-4. **Testing**: Aggiungi unit test per le funzionalità principali
+### **Extend the Project**
+1. **Add Favorites**: Recipe saving system with localStorage
+2. **Improve UX**: Implement predictive search and autocomplete  
+3. **PWA Features**: Make the app installable and offline-capable
+4. **Testing**: Add unit tests for core functionality
 
-### **Progetti Correlati**
-- **Todo App Avanzata**: Gestione task con categorie e filtri
-- **E-commerce SPA**: Shopping cart e checkout process
-- **Dashboard Analytics**: Grafici e visualizzazioni dati
-- **Chat App**: Real-time messaging con WebSocket
+### **Related Projects**
+- **Advanced Todo App**: Task management with categories and filters
+- **E-commerce SPA**: Shopping cart and checkout process
+- **Analytics Dashboard**: Charts and data visualizations
+- **Chat App**: Real-time messaging with WebSocket
 
-## 📚 **Risorse Aggiuntive**
+## 📚 **Additional Resources**
 
-### **Documentazione Ayisha.js**
-- [Sito Ufficiale](https://www.ayisha.app)
+### **Ayisha.js Documentation**
+- [Official Website](https://www.ayisha.app)
 - [GitHub Repository](https://github.com/BenJrSky/ayisha.js)
-- [Esempi e Demo](https://www.ayisha.app/examples)
 
 ### **API References**
 - [TheMealDB Documentation](https://www.themealdb.com/api.php)
 - [REST API Best Practices](https://restfulapi.net/)
 
-### **Design e UX**
+### **Design and UX**
 - [Modern CSS Techniques](https://developer.mozilla.org/en-US/docs/Web/CSS)
 - [Responsive Design Patterns](https://web.dev/responsive-web-design-basics/)
 
-## 🤝 **Contribuire**
+## 🤝 **Contributing**
 
-Questo progetto tutorial è open source! Contribuisci con:
+This tutorial project is open source! Contribute with:
 
-- 🐛 **Bug Reports**: Segnala problemi nel codice
-- 💡 **Feature Ideas**: Proponi nuove funzionalità didattiche  
-- 📝 **Documentation**: Migliora questa guida
-- 🎨 **UI/UX**: Ottimizza design e usabilità
-- 🧪 **Tests**: Aggiungi test per garantire stabilità
+- 🐛 **Bug Reports**: Report issues in the code
+- 💡 **Feature Ideas**: Propose new educational features  
+- 📝 **Documentation**: Improve this guide
+- 🎨 **UI/UX**: Optimize design and usability
+- 🧪 **Tests**: Add tests to ensure stability
 
-### **Come Contribuire**
+### **How to Contribute**
 ```bash
-# 1. Fork del repository
-# 2. Crea un branch per la tua feature
-git checkout -b feature/nome-feature
+# 1. Fork the repository
+# 2. Create a branch for your feature
+git checkout -b feature/feature-name
 
-# 3. Commit delle modifiche
-git commit -m "Add: descrizione delle modifiche"
+# 3. Commit your changes
+git commit -m "Add: description of changes"
 
-# 4. Push e crea una Pull Request
-git push origin feature/nome-feature
+# 4. Push and create a Pull Request
+git push origin feature/feature-name
 ```
 
-## 📊 **Metriche del Tutorial**
+## 📊 **Tutorial Metrics**
 
-### **Difficoltà**: ⭐⭐⭐ (Intermedio)
-### **Tempo Stimato**: 4-6 ore
-### **Prerequisiti**: 
-- HTML, CSS, JavaScript base
-- Conoscenza base dei concetti SPA
-- Familiarità con API REST
+### **Difficulty**: ⭐⭐⭐ (Intermediate)
+### **Estimated Time**: 4-6 hours
+### **Prerequisites**: 
+- Basic HTML, CSS, JavaScript
+- Basic knowledge of SPA concepts
+- Familiarity with REST APIs
 
-### **Competenze Acquisite**:
-- ✅ Sviluppo SPA con framework moderno
-- ✅ Gestione stato reattivo
-- ✅ Integrazione API esterne  
-- ✅ Architettura component-based
-- ✅ Responsive design avanzato
+### **Skills Acquired**:
+- ✅ Modern framework SPA development
+- ✅ Reactive state management
+- ✅ External API integration  
+- ✅ Component-based architecture
+- ✅ Advanced responsive design
 
-## 🔮 **Evoluzioni Future del Tutorial**
+## 🔮 **Future Tutorial Evolution**
 
-### **Versione 2.0 - Funzionalità Avanzate**
-- [ ] Sistema di autenticazione utenti
-- [ ] Database locale con IndexedDB
-- [ ] Modalità offline con Service Workers
-- [ ] Notifiche push per nuove ricette
-- [ ] Integrazione social sharing
+### **Version 2.0 - Advanced Features**
+- [ ] User authentication system
+- [ ] Local database with IndexedDB
+- [ ] Offline mode with Service Workers
+- [ ] Push notifications for new recipes
+- [ ] Social sharing integration
 
-### **Versione 3.0 - Scaling e Performance**  
-- [ ] Code splitting e lazy loading
-- [ ] Ottimizzazioni performance avanzate
+### **Version 3.0 - Scaling and Performance**  
+- [ ] Code splitting and lazy loading
+- [ ] Advanced performance optimizations
 - [ ] A/B testing framework
-- [ ] Analytics e tracking utenti
-- [ ] Internazionalizzazione completa
+- [ ] User analytics and tracking
+- [ ] Complete internationalization
 
 ---
 
-## 🎓 **Conclusione**
+## 🎓 **Conclusion**
 
-Questo tutorial **Recipe Browser** rappresenta un esempio completo di come Ayisha.js possa essere utilizzato per creare applicazioni web moderne, reattive e performanti. 
+This **Recipe Browser** tutorial represents a complete example of how Ayisha.js can be used to create modern, reactive, and performant web applications. 
 
-La semplicità della sintassi, combinata con la potenza delle funzionalità, rende Ayisha.js ideale sia per principianti che vogliono imparare i concetti SPA, sia per sviluppatori esperti che cercano un framework leggero e produttivo.
+The simplicity of the syntax, combined with the power of the features, makes Ayisha.js ideal for both beginners wanting to learn SPA concepts and experienced developers looking for a lightweight and productive framework.
 
-**Buon coding e buon appetito! 🍽️✨**
+**Happy coding and bon appétit! 🍽️✨**
 
 ---
 
-**Recipe Browser Tutorial** - Creato con ❤️ per la community Ayisha.js  
-*Un progetto [devBen](https://www.devben.app) per imparare il web development moderno*
+**Recipe Browser Tutorial** - Created with ❤️ for the Ayisha.js community  
+*A [devBen](https://www.devben.app) project for learning modern web development*
