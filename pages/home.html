@@ -1,0 +1,75 @@
+<div class="container">
+
+    <component @src="/components/search-section.html"></component>
+
+    <!-- Main sections -->
+    <div class="categories-grid">
+        <div class="category-card" @link="categories">
+            <img src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=200&fit=crop"
+                alt="Categories" class="category-image">
+            <div class="category-info">
+                <h3 class="category-name">⊞ Explore Categories</h3>
+                <p class="category-description">
+                    Browse recipes by category: appetizers, main courses, desserts, and much more.
+                    Easily find what you're looking for.
+                </p>
+            </div>
+        </div>
+
+        <div class="category-card" @link="search">
+            <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=200&fit=crop" alt="Search"
+                class="category-image">
+            <div class="category-info">
+                <h3 class="category-name">⊙ Advanced Search</h3>
+                <p class="category-description">
+                    Search recipes by name, main ingredient, or area.
+                    Advanced filters to find exactly what you want.
+                </p>
+            </div>
+        </div>
+
+        <div class="category-card" @link="random">
+            <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=200&fit=crop" alt="Random"
+                class="category-image">
+            <div class="category-info">
+                <h3 class="category-name">⊛ Random Recipe</h3>
+                <p class="category-description">
+                    Not sure what to cook? Get inspired by a randomly selected recipe.
+                    Perfect for discovering new flavors!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popular recipes -->
+    <div style="margin-top: 4rem;">
+        <h2 style="text-align: center; margin-bottom: 2rem; color: var(--text-dark);">◐ Popular Recipes</h2>
+
+        <!-- Carica 6 ricette casuali come popolari -->
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe1"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe2"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe3"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe4"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe5"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe6"></div>
+
+        <!-- Combina i risultati -->
+        <div @source="[randomRecipe1?.meals?.[0], randomRecipe2?.meals?.[0], randomRecipe3?.meals?.[0], randomRecipe4?.meals?.[0], randomRecipe5?.meals?.[0], randomRecipe6?.meals?.[0]]"
+            @filter="item && item.idMeal" @result="popularRecipes"></div>
+
+        <div class="recipes-grid">
+            <div @if="!popularRecipes || popularRecipes.length === 0" class="loading">
+                Loading popular recipes...
+            </div>
+
+            <div @for="recipe in popularRecipes" @key="recipe.idMeal" class="recipe-card fade-in">
+                <img src="{{recipe.strMealThumb}}" alt="recipe.strMeal" class="recipe-image" @click="selectedMealId = recipe.idMeal" @link="recipe-detail">
+                <div class="recipe-info">
+                    <h3 class="recipe-name" @text="recipe.strMeal"></h3>
+                    <span class="recipe-category" @text="recipe.strCategory"@click="selectedCategory = recipe.strCategory" @link="category-meals"></span>
+                    <p class="recipe-area">◎ <span @text="recipe.strArea"></span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

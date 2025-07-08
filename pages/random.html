@@ -1,0 +1,31 @@
+<div class="container">
+                <div class="search-section text-center">
+                    <h2 style="margin-bottom: 2rem; color: var(--text-dark);">⦛ Random Recipe</h2>
+                    <p style="color: var(--text-light); margin-bottom: 2rem;">
+                        Get inspired by a randomly selected recipe!
+                    </p>
+                    <button @click="loading = !loading" class="search-btn" style="margin-bottom: 2rem;">
+                        🎲 New random recipe
+                    </button>
+                </div>
+
+                <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomMealData" @watch="loading" @then="randomMeal=randomMealData?.meals?.[0]" ></div>
+
+                <div @if="randomMeal" class="recipe-detail-container">
+                    <div class="recipe-header">
+                        <img src="{{randomMeal.strMealThumb}}" alt="randomMeal.strMeal" class="recipe-detail-image">
+                        <div class="recipe-header-info">
+                            <h1 @text="randomMeal.strMeal"></h1>
+                            <div class="recipe-meta">
+                                <span class="recipe-category" @text="randomMeal.strCategory"></span>
+                                <span class="recipe-area">◎ <span @text="randomMeal.strArea"></span></span>
+                            </div>
+                            <button @click="selectedMealId = randomMeal.idMeal; currentPage = 'recipe-detail'" class="search-btn">
+                                View full recipe
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div @if="!randomMeal" class="loading">Loading random recipe...</div>
+            </div>

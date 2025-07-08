@@ -1,0 +1,12 @@
+       <div class="search-section">
+                    <h2 style="margin-bottom: 1rem; color: var(--text-dark);">Welcome to the world of recipes!</h2>
+                    <p style="color: var(--text-light); margin-bottom: 2rem; font-size: 1.1rem;">
+                        Explore thousands of recipes from around the world. Search by name, browse by category, or be surprised by a random recipe.
+                    </p>
+                    
+                    <!-- Quick search -->
+                    <div class="search-container">
+                        <input type="text" @model="quickSearch" class="search-input" placeholder="Search for a recipe...">
+                        <button @click="searchQuery = quickSearch; currentPage = 'search'; quickSearch = ''" @link="search" class="search-btn">⊙ Search</button>
+                    </div>
+                </div>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Browser - Sfoglia le Ricette</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="../../ayisha-1.0.1.js"></script>
+</head>
+<body>
+    <init>
+        currentPage = 'home';
+        quickSearch = '';
+        selectedCategory = '';
+        selectedMealId = '';
+        searchQuery = '';
+        searchType = 'name';
+        searchIngredient = '';
+        searchArea = '';
+        searchLetter = 'A';
+        popularRecipes = [];
+        categories = [];
+        categoryMeals = [];
+        searchResults = [];
+        currentRecipe = null;
+        randomMeal = null;
+        loading = false;
+        error = '';
+    </init>
+
+
+    <!-- HEADER -->
+    <component @src="./components/header.html"></component>
+    
+    <!-- NAV BAR -->
+    <component @src="./components/nav.html"></component>
+    <!-- PAGINA HOME -->
+    <component @src="./pages/home.html" @page="home"></component>
+    <!-- PAGINA CATEGORIE -->
+    <component @src="./pages/categories.html" @page="categories"></component>
+    <!-- PAGINA RICETTE PER CATEGORIA -->
+    <component @src="./pages/category-meals.html" @page="category-meals"></component>
+    <!-- PAGINA CERCA -->
+    <component @src="./pages/search.html" @page="search"></component>
+    <!-- PAGINA RICETTA CASUALE -->
+    <component @src="./pages/random.html" @page="random"></component>
+     <!-- PAGINA DETTAGLIO RICETTA -->
+    <component @src="./pages/recipe-detail.html" @page="recipe-detail"></component>
+
+    <!-- <div @state></div> -->
+
+    <component @src="./components/footer.html"></component>
+
+</body>
+</html>

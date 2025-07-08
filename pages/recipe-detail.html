@@ -1,0 +1,115 @@
+ <div class="container">
+                <!-- Carica dettagli ricetta -->
+                <div @fetch="https://www.themealdb.com/api/json/v1/1/lookup.php?i={selectedMealId}" @result="recipeData" @watch="selectedMealId" @then="currentRecipe=true"></div>
+
+                <div @if="recipeData?.meals?.[0]">
+                <button @link="search" class="search-btn" style="margin-bottom: 2rem;">
+                    ← Back
+                </button>
+                    
+                    <div class="recipe-detail-container">
+                        <div class="recipe-header">
+                            <img src="{{recipeData?.meals?.[0].strMealThumb}}" alt="recipeData?.meals?.[0].strMeal" class="recipe-detail-image">
+                            <div class="recipe-header-info">
+                                <h1 @text="recipeData?.meals?.[0].strMeal"></h1>
+                                <div class="recipe-meta">
+                                    <span class="recipe-category pointer" @text="recipeData?.meals?.[0].strCategory" @click="selectedCategory = recipeData?.meals?.[0].strCategory" @link="category-meals"></span>
+                                    <span class="recipe-area">◎ <span @text="recipeData?.meals?.[0].strArea"></span></span>
+                                </div>
+                                <div @if="recipeData?.meals?.[0].strTags" class="recipe-tags">
+                                    <strong>Tags:</strong> <span @text="recipeData?.meals?.[0].strTags"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="recipe-content">
+                        <div class="recipe-section">
+                            <h3>📋 Ingredients</h3>
+                            <ul class="ingredients-list">
+                                    <li @if="recipeData?.meals?.[0].strIngredient1 && recipeData?.meals?.[0].strIngredient1.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure1"></span> <strong @text="recipeData?.meals?.[0].strIngredient1"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient2 && recipeData?.meals?.[0].strIngredient2.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure2"></span> <strong @text="recipeData?.meals?.[0].strIngredient2"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient3 && recipeData?.meals?.[0].strIngredient3.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure3"></span> <strong @text="recipeData?.meals?.[0].strIngredient3"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient4 && recipeData?.meals?.[0].strIngredient4.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure4"></span> <strong @text="recipeData?.meals?.[0].strIngredient4"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient5 && recipeData?.meals?.[0].strIngredient5.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure5"></span> <strong @text="recipeData?.meals?.[0].strIngredient5"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient6 && recipeData?.meals?.[0].strIngredient6.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure6"></span> <strong @text="recipeData?.meals?.[0].strIngredient6"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient7 && recipeData?.meals?.[0].strIngredient7.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure7"></span> <strong @text="recipeData?.meals?.[0].strIngredient7"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient8 && recipeData?.meals?.[0].strIngredient8.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure8"></span> <strong @text="recipeData?.meals?.[0].strIngredient8"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient9 && recipeData?.meals?.[0].strIngredient9.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure9"></span> <strong @text="recipeData?.meals?.[0].strIngredient9"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient10 && recipeData?.meals?.[0].strIngredient10.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure10"></span> <strong @text="recipeData?.meals?.[0].strIngredient10"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient11 && recipeData?.meals?.[0].strIngredient11.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure11"></span> <strong @text="recipeData?.meals?.[0].strIngredient11"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient12 && recipeData?.meals?.[0].strIngredient12.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure12"></span> <strong @text="recipeData?.meals?.[0].strIngredient12"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient13 && recipeData?.meals?.[0].strIngredient13.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure13"></span> <strong @text="recipeData?.meals?.[0].strIngredient13"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient14 && recipeData?.meals?.[0].strIngredient14.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure14"></span> <strong @text="recipeData?.meals?.[0].strIngredient14"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient15 && recipeData?.meals?.[0].strIngredient15.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure15"></span> <strong @text="recipeData?.meals?.[0].strIngredient15"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient16 && recipeData?.meals?.[0].strIngredient16.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure16"></span> <strong @text="recipeData?.meals?.[0].strIngredient16"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient17 && recipeData?.meals?.[0].strIngredient17.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure17"></span> <strong @text="recipeData?.meals?.[0].strIngredient17"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient18 && recipeData?.meals?.[0].strIngredient18.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure18"></span> <strong @text="recipeData?.meals?.[0].strIngredient18"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient19 && recipeData?.meals?.[0].strIngredient19.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure19"></span> <strong @text="recipeData?.meals?.[0].strIngredient19"></strong>
+                                    </li>
+                                    <li @if="recipeData?.meals?.[0].strIngredient20 && recipeData?.meals?.[0].strIngredient20.trim()">
+                                        <span @text="recipeData?.meals?.[0].strMeasure20"></span> <strong @text="recipeData?.meals?.[0].strIngredient20"></strong>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="recipe-section">
+                                <h3>👨‍🍳 Instructions</h3>
+                                <div class="instructions" @text="recipeData?.meals?.[0].strInstructions"></div>
+                            </div>
+
+                            <div @if="recipeData?.meals?.[0].strYoutube" class="recipe-section">
+                                <h3>📺 Video Tutorial</h3>
+                                <a href="{{recipeData?.meals?.[0].strYoutube}}" target="_blank" class="youtube-link">
+                                    Watch on YouTube
+                                </a>
+                            </div>
+
+                            <div @if="recipeData?.meals?.[0].strSource" class="recipe-section">
+                                <h3>🔗 Source</h3>
+                                <a href="{{recipeData?.meals?.[0].strSource}}" target="_blank" class="source-link">
+                                    Go to original source
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div @if="!currentRecipe" class="loading">Loading recipe...</div>
+            </div>

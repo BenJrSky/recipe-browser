@@ -1,0 +1,26 @@
+
+
+
+    <span @switch="_currentPage">
+
+        <header @default class="header">
+            <h1>◉ Recipe Browser</h1>
+            <p>Discover delicious recipes from around the world</p>
+        </header>
+
+        <header @case="categories" class="header">
+            <h1>⦞ Categories</h1>
+            <p>Browse recipes by category</p>
+        </header>
+
+        <header @case="search" class="header">
+            <h1>⊙ Search</h1>
+            <p>Find recipes by name, ingredient, or area</p>
+        </header>
+
+        <header @case="random" class="header">
+            <h1>⦛ Random Recipe</h1>
+            <p>Get inspired by a randomly selected recipe</p>
+        </header>
+
+    </span>

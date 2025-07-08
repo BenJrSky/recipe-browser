@@ -1,0 +1,27 @@
+     <div class="container">
+                <div class="search-section">
+                    <h2 style="margin-bottom: 1rem; color: var(--text-dark);">
+                        Recipes: <span @text="selectedCategory"></span>
+                    </h2>
+                    <button @link="categories" class="search-btn" style="margin-bottom: 2rem;">
+                        ← Back to categories
+                    </button>
+                </div>
+
+                <!-- Carica ricette per categoria -->
+                <div @fetch="https://www.themealdb.com/api/json/v1/1/filter.php?c={selectedCategory}" @result="categoryMealsData" @watch="selectedCategory"></div>
+
+                <div class="recipes-grid">
+                    <div @if="!categoryMealsData.meals || categoryMealsData.meals.length === 0" class="loading">
+                        Loading recipes...
+                    </div>
+                    
+                    <div @for="meal in categoryMealsData.meals" @key="meal.idMeal" class="recipe-card fade-in"
+                         @click="selectedMealId = meal.idMeal" @link="recipe-detail">
+                        <img src="{{meal.strMealThumb}}" alt="meal.strMeal" class="recipe-image">
+                        <div class="recipe-info">
+                            <h3 class="recipe-name" @text="meal.strMeal"></h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
