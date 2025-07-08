@@ -62,6 +62,8 @@
                 <button @click="loading = true" class="search-btn">⊙ Search</button>
             </div>
 
+            <div @state="searchArea"></div>
+
             <div @case="ingredient" class="search-container">
                 <input type="text" @model="searchIngredient" class="search-input"
                     placeholder="Enter the ingredient (e.g. chicken)">

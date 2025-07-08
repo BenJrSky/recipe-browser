@@ -14,7 +14,7 @@
                                 <h1 @text="recipeData?.meals?.[0].strMeal"></h1>
                                 <div class="recipe-meta">
                                     <span class="recipe-category pointer" @text="recipeData?.meals?.[0].strCategory" @click="selectedCategory = recipeData?.meals?.[0].strCategory" @link="category-meals"></span>
-                                    <span class="recipe-area">◎ <span @text="recipeData?.meals?.[0].strArea"></span></span>
+                                    <span class="recipe-area pointer">◎ <span @text="recipeData?.meals?.[0].strArea" @click="searchArea = recipeData?.meals?.[0].strArea; searchType='area'; loading = true" @link="search"></span></span>
                                 </div>
                                 <div @if="recipeData?.meals?.[0].strTags" class="recipe-tags">
                                     <strong>Tags:</strong> <span @text="recipeData?.meals?.[0].strTags"></span>
