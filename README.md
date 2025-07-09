@@ -20,13 +20,100 @@ This tutorial will teach you how to:
 
 ## 📚 Ayisha.js Concepts Demonstrated
 
-### **🔧 Core Directives**
-- `@if/@show/@hide` - Conditional rendering
-- `@for` - Iteration over lists and arrays
-- `@model` - Two-way data binding
-- `@click/@hover/@input` - Event handling
-- `@fetch/@result` - Asynchronous API calls
-- `@link/@page` - SPA routing and navigation
+
+## 🧭 **Ayisha.js Directives: Complete List, Description, Usage & Execution Order**
+
+### **Directive Execution Order (Hierarchy)**
+The execution order of directives on a node follows this hierarchy (from top to bottom):
+
+1. **@page** / **@if** / **@show** / **@hide**  
+   - Determine if the node is rendered. If the condition is not met, other directives are not executed.
+2. **@for**  
+   - Handles repeating the node for each item in a list. All child directives are applied for each iteration.
+3. **@fetch** / **@result** / **@source** / **@map** / **@filter** / **@reduce** / **@initial**  
+   - Handle asynchronous data loading and data transformation.
+4. **@component** / **@src**  
+   - Load external components or HTML templates.
+5. **@model** / **@validate**  
+   - Handle two-way binding and input validation.
+6. **@class** / **@style**  
+   - Handle dynamic CSS classes and styles.
+7. **@click** / **@input** / **@focus** / **@blur** / **@change** / **@hover** / **@set**  
+   - Handle user events and state assignments.
+8. **@text**  
+   - Updates the node's text content.
+9. **@key**  
+   - Helps track unique nodes in @for loops.
+10. **@then** / **@finally**  
+   - Execute code after all other directives on the node.
+11. **@log** / **@state**  
+   - Show logs or state for debugging.
+12. **no**  
+   - Disables interpolation on the content.
+
+---
+
+### **Ayisha.js Directives List**
+
+| Directive         | Description | Usage / Example |
+|-------------------|-------------|-------------------------|
+| `@if`             | Show the node only if the condition is true | `<div @if="condition">Visible if true</div>` |
+| `@show`           | Show the node if the condition is true (like @if, but does not remove from DOM) | `<div @show="condition">Show if true</div>` |
+| `@hide`           | Hide the node if the condition is true | `<div @hide="condition">Hide if true</div>` |
+| `@for`            | Repeat the node for each item in a list | `<li @for="item in items">{{item}}</li>` |
+| `@model`          | Two-way binding between input and state | `<input @model="name">` |
+| `@validate`       | Apply validation rules to input | `<input @validate="required,minLength:3">` |
+| `@click`          | Execute code on click | `<button @click="state.count++">Increment</button>` |
+| `@input`          | Execute code on input | `<input @input="doSomething()">` |
+| `@focus`          | Execute code on focus | `<input @focus="doSomething()">` |
+| `@blur`           | Execute code on blur | `<input @blur="doSomething()">` |
+| `@change`         | Execute code on change | `<input @change="doSomething()">` |
+| `@hover`          | Execute code on hover | `<div @hover="doSomething()"></div>` |
+| `@set`            | Assign values to state on event | `<button @set:click="foo=1"></button>` |
+| `@fetch`          | Perform a fetch (API call) | `<div @fetch="'url'" @result="data"></div>` |
+| `@result`         | Target variable for @fetch result | `<div @fetch="'url'" @result="data"></div>` |
+| `@source`         | Data source for transformations | `<div @source="items" @map="item => item*2" @result="double"></div>` |
+| `@map`            | Transform a list | `<div @source="items" @map="item => item*2"></div>` |
+| `@filter`         | Filter a list | `<div @source="items" @filter="item > 0"></div>` |
+| `@reduce`         | Reduce a list to a value | `<div @source="items" @reduce="(acc, item) => acc+item" @initial="0"></div>` |
+| `@initial`        | Initial value for @reduce | `<div @source="items" @reduce="..." @initial="0"></div>` |
+| `@component`      | Load an external component | `<component @src="comp.html"></component>` |
+| `@src`            | URL of the external component | `<component @src="comp.html"></component>` |
+| `@link`           | SPA navigation | `<a @link="page">Go</a>` |
+| `@page`           | Show the node only on a specific page | `<div @page="home">Only on home</div>` |
+| `@key`            | Unique identifier for @for loops | `<li @for="item in items" @key="item.id"></li>` |
+| `@switch`         | Switch on a value | `<div @switch="value"><div @case="1">One</div><div @default>Other</div></div>` |
+| `@case`           | Case for @switch | `<div @case="1">One</div>` |
+| `@default`        | Default for @switch | `<div @default>Other</div>` |
+| `@animate`        | Apply CSS animation | `<div @animate="fade-in"></div>` |
+| `@state`          | Show current state as JSON | `<div @state></div>` |
+| `@log`            | Show directive logs on the element | `<div @log></div>` |
+| `@text`           | Update the node's text | `<span @text="name"></span>` |
+| `no`              | Disable interpolation | `<no>{{name}}</no>` |
+| `@then`           | Execute code after all other directives | `<div @then="foo=1;;bar=2"></div>` |
+| `@finally`        | Execute code after everything, including @then | `<div @finally="foo=1;;bar=2"></div>` |
+
+#### **Event Variants**
+Many directives support an event variant, e.g.:
+- `@click:input`, `@fetch:click`, `@model:change`, `@class:hover`, etc.
+These allow you to bind the directive to a specific DOM event.
+
+#### **Detailed Functionality**
+- **Conditionals**: `@if`, `@show`, `@hide`, `@page` control node visibility/rendering.
+- **Loops**: `@for` repeats the node for each item in a list.
+- **Async Data**: `@fetch` performs a fetch call, `@result` receives the result, `@source` enables array transformations.
+- **Components**: `@component` and `@src` load external HTML as templates.
+- **Binding**: `@model` binds input and state, `@validate` applies validation rules.
+- **Events**: `@click`, `@input`, `@focus`, `@blur`, `@change`, `@hover`, `@set` handle user events and update state.
+- **Styles**: `@class`, `@style` allow dynamic classes and styles.
+- **Text**: `@text` updates the node's text.
+- **Log & Debug**: `@log`, `@state` show debug info.
+- **Switch**: `@switch`, `@case`, `@default` for multi-conditional rendering.
+- **Animations**: `@animate` applies animation classes.
+- **Special**: `@then`, `@finally` for post-directive execution, `no` disables interpolation.
+
+---
+For details, advanced examples and use cases, see the official documentation or the `ayisha-1.0.1.js` source code.
 
 ### **🧩 Components and Architecture**
 - External components loaded dynamically
