@@ -1,4 +1,4 @@
-    <nav class="nav">
+    <nav @show="headerExpanded" class="nav">
         <div class="nav-container">
             <a href="#" @link="home" @class="{'nav-link': true, 'active': _currentPage === 'home'}">⌂ Home</a>
             <a href="#" @link="categories" @class="{'nav-link': true, 'active': _currentPage === 'categories'}">⊞ Categories</a>

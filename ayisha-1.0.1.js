@@ -1780,6 +1780,7 @@
       this._isRendering = false;
       this._processedSetDirectives = new Set(); // Track processed @set directives
       this._componentRenderTimeout = null; // Timeout per debounce del rendering dei componenti
+      this._setNodes = new WeakSet(); // Track real DOM nodes already initialized by @set
 
       // Initialize modules in correct order
       this.evaluator = new ExpressionEvaluator(this.state);
@@ -2412,9 +2413,44 @@
 
     _renderVNode(vNode, ctx) {
       if (!vNode) return null;
-
-      // Sposta la logica di filtro @page DOPO il caricamento/caching del componente
-      // In questo modo tutti i componenti vengono fetchati/cachati, ma solo quello attivo viene renderizzato
+      // Esegui @set solo se la variabile non è già definita nello stato
+      if (vNode.directives && vNode.directives['@set'] && !vNode._setProcessed) {
+        let setExprs = vNode.directives['@set'];
+        if (Array.isArray(setExprs)) {
+          setExprs = setExprs.flat().filter(Boolean);
+        } else if (typeof setExprs === 'string') {
+          setExprs = setExprs.split(/;;|\n/).map(s => s.trim()).filter(Boolean);
+        } else {
+          setExprs = [setExprs];
+        }
+        setExprs.forEach(expr => {
+          try {
+            // Estrai la variabile a sinistra dell'assegnamento (es: headerExpanded = true)
+            const match = String(expr).match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/);
+            if (match) {
+              const varName = match[1];
+              if (typeof this.state[varName] === 'undefined') {
+                if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
+                  const cleanExpr = String(expr).replace(/\bstate\./g, '');
+                  new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
+                }
+              }
+            } else {
+              // fallback: esegui solo se non è un semplice assegnamento
+              if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
+                const cleanExpr = String(expr).replace(/\bstate\./g, '');
+                new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
+              }
+            }
+          } catch (e) {
+            console.error('Error in @set directive:', e, 'Expression:', expr);
+            if (!vNode._setErrors) vNode._setErrors = [];
+            vNode._setErrors.push(e.message);
+          }
+        });
+        vNode._setProcessed = true;
+        delete vNode.directives['@set'];
+      }
 
       Object.entries(vNode.directives || {}).forEach(([dir, expr]) => {
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim())) {

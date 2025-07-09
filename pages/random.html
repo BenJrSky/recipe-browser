@@ -27,7 +27,5 @@
                     </div>
                 </div>
 
-                <div @if="!randomMeal.idMeal" class="loading">Loading random recipe...</div>
-
-                <p @state="randomMeal"></p>
+                <div @show="!randomMeal.idMeal" class="loading">Loading random recipe...</div>
             </div>

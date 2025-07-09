@@ -1,26 +1,66 @@
 
 
+<div></div>
 
-    <span @switch="_currentPage">
+<span @switch="_currentPage"  @set="headerExpanded = true"> 
 
         <header @default class="header">
-            <h1>◉ Recipe Browser</h1>
-            <p>Discover delicious recipes from around the world</p>
+            <button class="header-toggle" @click="headerExpanded = !headerExpanded" @class="active: headerExpanded">
+                <span class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+            <div class="header-content" @class="expanded: headerExpanded">
+                <h1>◉ Recipe Browser</h1>
+                <p>Discover delicious recipes from around the world</p>
+                <p @if="headerExpanded" style="color: red; font-size: 12px;">DEBUG: Menu is expanded</p>
+            </div>
         </header>
 
         <header @case="categories" class="header">
-            <h1>⦞ Categories</h1>
-            <p>Browse recipes by category</p>
+            <button class="header-toggle" @click="headerExpanded = !headerExpanded" @class="active: headerExpanded">
+                <span class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+            <div class="header-content" @class="expanded: headerExpanded">
+                <h1>⦞ Categories</h1>
+                <p>Browse recipes by category</p>
+            </div>
         </header>
 
         <header @case="search" class="header">
-            <h1>⊙ Search</h1>
-            <p>Find recipes by name, ingredient, or area</p>
+            <button class="header-toggle" @click="headerExpanded = !headerExpanded" @class="active: headerExpanded">
+                <span class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+            <div class="header-content" @class="expanded: headerExpanded">
+                <h1>⊙ Search</h1>
+                <p>Find recipes by name, ingredient, or area</p>
+            </div>
         </header>
 
         <header @case="random" class="header">
-            <h1>⦛ Random Recipe</h1>
-            <p>Get inspired by a randomly selected recipe</p>
+            <button class="header-toggle" @click="headerExpanded = !headerExpanded" @class="active: headerExpanded">
+                <span class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+            <div class="header-content" @class="expanded: headerExpanded">
+                <h1>⦛ Random Recipe</h1>
+                <p>Get inspired by a randomly selected recipe</p>
+            </div>
         </header>
-
     </span>
+
+
+    <span @state="headerExpanded"></span>
