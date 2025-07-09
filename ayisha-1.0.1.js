@@ -1919,6 +1919,25 @@
       if (!this.state._currentPage) this.state._currentPage = '';
       if (!this.state._version) this.state._version = AyishaVDOM.version;
       if (!this.state._locale) this.state._locale = (navigator.language || navigator.userLanguage || 'en');
+
+      // --- Always present: _currentBreakpoint and :screenSize ---
+      const getBreakpoint = (w) => {
+        if (w < 576) return 'xs';
+        if (w < 768) return 'sm';
+        if (w < 992) return 'md';
+        if (w < 1200) return 'lg';
+        if (w < 1400) return 'xl';
+        return 'xxl';
+      };
+      const updateScreenVars = () => {
+        this.state._currentBreakpoint = getBreakpoint(window.innerWidth);
+        this.state._screenSize = window.innerWidth;
+      };
+      updateScreenVars();
+      if (!this._breakpointListenerAdded) {
+        window.addEventListener('resize', updateScreenVars);
+        this._breakpointListenerAdded = true;
+      }
     }
 
     _makeReactive() {
