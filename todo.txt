@@ -1,3 +1,8 @@
 
 
 al refresh della pagina reindirizza alla pagina /
+
+
+@watch="test" @true:watch="list.push(test)"  @false:watch="err.push(test)"
+
+@if="test==5"

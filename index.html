@@ -28,6 +28,17 @@
         error = '';
     </init>
 
+    <span @when="_currentPage=='home'" @do="step='001'"></span>
+    <span @when="_currentPage=='random'" @do="step='001'"></span>
+
+    <span @when="_currentPage=='search'" @wait="2000" @do="step='002'"></span>
+    <span @when="_currentPage=='search'" @wait="3000" @go="random"></span>
+
+
+   
+
+<span @state="step"></span>
+
 
     <!-- HEADER -->
     <component @src="./components/header.html"></component>

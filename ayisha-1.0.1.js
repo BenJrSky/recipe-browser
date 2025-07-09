@@ -580,6 +580,10 @@
   class DirectiveHelpSystem {
     constructor() {
       this.helpTexts = {
+        '@when': `Esempio: <span @when="condizione" @do="azione"></span> oppure <span @when="condizione" @go="pagina"></span>`,
+        '@do': `Esempio: <span @when="condizione" @do="azione"></span>`,
+        '@go': `Esempio: <span @when="condizione" @go="pagina"></span>`,
+        '@wait': `Esempio: <span @when="condizione" @wait="1000" @go="pagina"></span>`,
         '@if': `Esempio: <div @if="condizione">Mostra se condizione è true</div>`,
         '@show': `Esempio: <div @show="condizione">Mostra se condizione è true</div>`,
         '@hide': `Esempio: <div @hide="condizione">Nasconde se condizione è true</div>`,
@@ -1666,6 +1670,117 @@
     }
   }
   class AyishaVDOM {
+    /**
+     * Gestione direttive: @when, @do, @go, @wait
+     * @when: osserva un'espressione, quando true attiva @do/@go (eventualmente dopo @wait)
+     * @do: esegue un'espressione
+     * @go: cambia _currentPage e aggiorna l'URL come @link
+     * @wait: attende n ms prima di attivare @do/@go
+     * Previene loop infiniti e segnala errori di sintassi
+     */
+    _handleWhenDoGoWaitDirectives(vNode, ctx) {
+      if (!vNode.directives || !vNode.directives['@when']) return;
+      const whenExpr = vNode.directives['@when'];
+      const doExpr = vNode.directives['@do'];
+      const goExpr = vNode.directives['@go'];
+      const waitExpr = vNode.directives['@wait'];
+      // Errore se manca sia @do che @go
+      if (!doExpr && !goExpr) {
+        if (vNode._el) {
+          vNode._el.setAttribute('data-ayisha-when-error', '@when richiede almeno @do o @go');
+        }
+        return;
+      }
+      if (!this._whenDirectiveTimers) this._whenDirectiveTimers = new WeakMap();
+      if (!this._whenDirectiveLoopGuards) this._whenDirectiveLoopGuards = new WeakMap();
+      let timer = this._whenDirectiveTimers.get(vNode) || null;
+      let loopGuard = this._whenDirectiveLoopGuards.get(vNode) || { count: 0, lastPage: null, lastDo: null, lastTime: 0 };
+      const evaluateWhen = () => {
+        try {
+          return this.evaluator.evalExpr(whenExpr, ctx);
+        } catch {
+          return false;
+        }
+      };
+      const triggerActions = () => {
+        // Loop guard: se la stessa azione viene triggerata >5 volte in 2s, errore
+        const now = Date.now();
+        let key = '';
+        if (goExpr) key += 'go:' + this.evaluator.evalExpr(goExpr, ctx);
+        if (doExpr) key += 'do:' + doExpr;
+        if (key === loopGuard.lastDo && (now - loopGuard.lastTime) < 2000) {
+          loopGuard.count++;
+        } else {
+          loopGuard.count = 1;
+        }
+        loopGuard.lastDo = key;
+        loopGuard.lastTime = now;
+        this._whenDirectiveLoopGuards.set(vNode, loopGuard);
+        if (loopGuard.count > 5) {
+          if (vNode._el) {
+            vNode._el.setAttribute('data-ayisha-when-error', 'Loop rilevato nelle direttive @when/@go/@do');
+          }
+          return;
+        }
+        if (doExpr) {
+          try { this.evaluator.executeDirectiveExpression(doExpr, ctx); } catch (e) { /* error */ }
+        }
+        if (goExpr) {
+          try {
+            let page = this.evaluator.evalExpr(goExpr, ctx);
+            if (typeof page === 'string') {
+              // Aggiorna _currentPage e URL come @link
+              this.state._currentPage = page;
+              // Aggiorna anche l'URL (simula routing SPA)
+              if (window && window.history && typeof window.history.pushState === 'function') {
+                let url = page;
+                // Se la pagina non termina con .html, aggiungilo (compatibilità con le altre pagine)
+                if (!/\.html$/.test(url) && document.querySelector(`component[@page='${page}']`)) {
+                  url = page + '.html';
+                }
+                window.history.pushState({}, '', url);
+                // Triggera manualmente l'evento popstate per forzare il rerender del router
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }
+            }
+          } catch (e) { /* error */ }
+        }
+      };
+      let lastValue = evaluateWhen();
+      let waiting = false;
+      const checkAndTrigger = () => {
+        const nowValue = evaluateWhen();
+        if (nowValue && !lastValue && !waiting) {
+          if (waitExpr) {
+            let ms = parseInt(this.evaluator.evalExpr(waitExpr, ctx), 10);
+            if (isNaN(ms)) ms = 0;
+            if (timer) clearTimeout(timer);
+            waiting = true;
+            timer = setTimeout(() => {
+              triggerActions();
+              timer = null;
+              waiting = false;
+              this._whenDirectiveTimers.delete(vNode);
+            }, ms);
+            this._whenDirectiveTimers.set(vNode, timer);
+          } else {
+            triggerActions();
+          }
+        } else if (!nowValue && timer) {
+          clearTimeout(timer);
+          timer = null;
+          waiting = false;
+          this._whenDirectiveTimers.delete(vNode);
+        }
+        lastValue = nowValue;
+      };
+      if (!vNode._ayishaWhenWatcher) {
+        vNode._ayishaWhenWatcher = true;
+        if (!this._whenDirectiveWatchers) this._whenDirectiveWatchers = [];
+        this._whenDirectiveWatchers.push(checkAndTrigger);
+      }
+      checkAndTrigger();
+    }
     static version = "1.0.1";
     constructor(root = document.body) {
       this.root = root;
@@ -2282,7 +2397,13 @@
     }
 
     _renderVNode(vNode, ctx) {
+      // Gestione direttive @when, @do, @go, @wait
+      this._handleWhenDoGoWaitDirectives(vNode, ctx);
       if (!vNode) return null;
+      // Esegui watcher delle direttive @when
+      if (this._whenDirectiveWatchers) {
+        this._whenDirectiveWatchers.forEach(fn => { try { fn(); } catch {} });
+      }
       if (vNode.directives && vNode.directives['@set'] && !vNode._setProcessed) {
         let setExprs = vNode.directives['@set'];
         if (Array.isArray(setExprs)) {
