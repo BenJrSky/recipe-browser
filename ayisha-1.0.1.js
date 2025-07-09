@@ -349,7 +349,6 @@
       this.components = {};
       this.cache = {};
       this.loadingComponents = new Map(); 
-      this.debugMode = true; 
     }
 
     component(name, html) {
@@ -357,21 +356,12 @@
     }
 
     async loadExternalComponent(url) {
-      if (this.debugMode) {
-        console.log(`🔄 ComponentManager: Loading component ${url}`);
-      }
 
       if (this.cache[url]) {
-        if (this.debugMode) {
-          console.log(`✅ ComponentManager: Found cached component ${url}`);
-        }
         return this.cache[url];
       }
 
       if (this.loadingComponents.has(url)) {
-        if (this.debugMode) {
-          console.log(`⏳ ComponentManager: Component ${url} already loading, waiting...`);
-        }
         return this.loadingComponents.get(url);
       }
 
@@ -381,9 +371,6 @@
       try {
         const html = await loadingPromise;
         this.cache[url] = html;
-        if (this.debugMode) {
-          console.log(`✅ ComponentManager: Successfully loaded component ${url} (${html.length} chars)`);
-        }
         return html;
       } catch (error) {
         console.error(`❌ ComponentManager: Error loading component ${url}:`, error);
@@ -394,20 +381,12 @@
     }
 
     async _fetchComponent(url) {
-      if (this.debugMode) {
-        console.log(`🌐 ComponentManager: Fetching ${url}`);
-      }
 
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const html = await response.text();
-
-      if (this.debugMode) {
-        console.log(`📄 ComponentManager: Received ${html.length} characters from ${url}`);
-      }
-
       return html;
     }
 
@@ -423,14 +402,8 @@
       return this.loadingComponents.has(url);
     }
 
-    setDebugMode(enabled) {
-      this.debugMode = enabled;
-    }
   }
 
-  /**
-   * Module: Reactivity System
-   */
   class ReactivitySystem {
     constructor(state, renderCallback) {
       this.state = state;
