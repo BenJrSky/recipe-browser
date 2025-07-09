@@ -4,15 +4,8 @@
  * License: MIT
  */
 (function () {
-  // Prevent redeclaration
   if (window.AyishaVDOM) return;
 
-  // ===== CORE MODULES =====
-
-  /**
-   * Module: Expression Evaluator
-   * Handles all expression evaluation and interpolation
-   */
   class ExpressionEvaluator {
     constructor(state) {
       this.state = state;
@@ -33,19 +26,14 @@
       }
     }
 
-    /**
-     * Execute multiple expressions separated by various delimiters
-     * Supports: semicolon (;), comma (,), or space-separated assignments
-     */
+
     executeMultipleExpressions(expr, ctx = {}, event) {
       const trimmed = expr.trim();
 
-      // If it's a simple expression, don't handle it here - let individual handlers take care of it
       if (!this.hasMultipleAssignments(trimmed)) {
         return false;
       }
 
-      // Parse multiple expressions
       const expressions = this.parseMultipleExpressions(trimmed);
 
       try {
@@ -66,23 +54,16 @@
       }
     }
 
-    /**
-     * General helper for executing expressions with multiple expressions support
-     * This can be used by ANY directive that needs to execute code
-     */
     executeDirectiveExpression(expr, ctx = {}, event = null, triggerRender = true) {
       let codeToRun = expr;
 
-      // Handle interpolation
       if (this.hasInterpolation(expr)) {
         codeToRun = this.evalAttrValue(expr, ctx);
       }
 
-      // Remove state. prefix
       const processedCode = codeToRun.replace(/\bstate\./g, '');
 
       try {
-        // Try multiple expressions first
         if (this.executeMultipleExpressions(processedCode, ctx, event)) {
           if (triggerRender) {
             setTimeout(() => window.ayisha && window.ayisha.render(), 0);
@@ -90,7 +71,6 @@
           return true;
         }
 
-        // Fallback to single expression
         const cleanCode = processedCode;
         new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${cleanCode}}}`)
           (this.state, ctx || {}, event);
@@ -105,54 +85,39 @@
       }
     }
 
-    /**
-     * Check if expression contains multiple assignments
-     */
     hasMultipleAssignments(expr) {
-      // If expression contains arrow functions, it's likely a single complex expression
       if (expr.includes('=>')) {
         return false;
       }
 
-      // If expression contains function calls with parentheses, be cautious
       if (expr.includes('(') && expr.includes(')')) {
-        // Only consider semicolon separation for complex expressions with functions
         const result = expr.includes(';');
         return result;
       }
 
-      // Quick checks for obvious separators
       if (expr.includes(';')) {
         return true;
       }
 
-      // Check comma separation (but be careful with function calls)
       if (expr.includes(',') && !expr.includes('(')) {
         return true;
       }
 
-      // Check space separation - look for pattern: var=value space var=value
       const spacePattern = /\w+\s*=\s*[^=\s]+\s+\w+\s*=\s*/;
       const spaceResult = spacePattern.test(expr);
       return spaceResult;
     }
 
-    /**
-     * Parse multiple expressions from various formats
-     */
+
     parseMultipleExpressions(expr) {
-      // First try semicolon separation
       if (expr.includes(';')) {
         return expr.split(';').map(e => e.trim()).filter(e => e);
       }
 
-      // Then try comma separation (but be careful with function calls)
       if (expr.includes(',') && !expr.includes('(')) {
         return expr.split(',').map(e => e.trim()).filter(e => e);
       }
 
-      // Finally try space separation using a more robust approach
-      // Look for patterns like: variable=value followed by space and another variable=value
       const expressions = [];
       let currentExpr = '';
       let inString = false;
@@ -178,13 +143,10 @@
           parenCount--;
           currentExpr += char;
         } else if (!inString && char === ' ' && parenCount === 0) {
-          // Check if we're at a space that could separate expressions
-          // Look ahead to see if there's a variable assignment pattern
           const remaining = expr.substring(i + 1).trim();
           if (remaining.match(/^\w+\s*=/) && currentExpr.trim().includes('=')) {
             expressions.push(currentExpr.trim());
             currentExpr = '';
-            // Skip the space
           } else {
             currentExpr += char;
           }
@@ -194,12 +156,10 @@
         i++;
       }
 
-      // Add the last expression
       if (currentExpr.trim()) {
         expressions.push(currentExpr.trim());
       }
 
-      // Return multiple expressions if we found more than one, otherwise single
       return expressions.length > 1 ? expressions : [expr];
     }
 
@@ -318,9 +278,7 @@
     }
   }
 
-  /**
-   * Module: DOM Parser
-   */
+
   class DOMParser {
     constructor(initBlocks) {
       this.initBlocks = initBlocks;
@@ -347,7 +305,6 @@
         return null;
       }
 
-      // Special handling for <no> tag - preserve raw HTML content
       if (tag === 'no') {
         return {
           tag: 'no',
@@ -355,7 +312,7 @@
           directives: {},
           subDirectives: {},
           children: [],
-          rawContent: node.innerHTML // Store the raw HTML content
+          rawContent: node.innerHTML 
         };
       }
 
@@ -387,15 +344,12 @@
     }
   }
 
-  /**
-   * Module: Component Manager
-   */
   class ComponentManager {
     constructor() {
       this.components = {};
       this.cache = {};
-      this.loadingComponents = new Map(); // Changed from Set to Map to store promises
-      this.debugMode = true; // Aggiunto per debugging
+      this.loadingComponents = new Map(); 
+      this.debugMode = true; 
     }
 
     component(name, html) {
@@ -407,7 +361,6 @@
         console.log(`🔄 ComponentManager: Loading component ${url}`);
       }
 
-      // Return cached component if available
       if (this.cache[url]) {
         if (this.debugMode) {
           console.log(`✅ ComponentManager: Found cached component ${url}`);
@@ -415,7 +368,6 @@
         return this.cache[url];
       }
 
-      // If already loading, return the existing promise
       if (this.loadingComponents.has(url)) {
         if (this.debugMode) {
           console.log(`⏳ ComponentManager: Component ${url} already loading, waiting...`);
@@ -423,7 +375,6 @@
         return this.loadingComponents.get(url);
       }
 
-      // Create and store the loading promise
       const loadingPromise = this._fetchComponent(url);
       this.loadingComponents.set(url, loadingPromise);
 
@@ -436,7 +387,6 @@
         return html;
       } catch (error) {
         console.error(`❌ ComponentManager: Error loading component ${url}:`, error);
-        // Don't cache errors to allow retry
         return null;
       } finally {
         this.loadingComponents.delete(url);
@@ -518,7 +468,6 @@
             });
           }
 
-          // Debounce renders to prevent loops
           if (this._renderTimeout) {
             clearTimeout(this._renderTimeout);
           }
@@ -1413,9 +1362,7 @@
     }
   }
 
-  /**
-   * Module: Error Handler
-   */
+
   class ErrorHandler {
     showAyishaError(el, err, expr) {
       if (!el) return;
@@ -1468,9 +1415,6 @@
     }
   }
 
-  /**
-   * Module: Binding Manager
-   */
   class BindingManager {
     constructor(evaluator, renderCallback) {
       this.evaluator = evaluator;
@@ -1479,7 +1423,6 @@
     }
 
     bindModel(el, key, ctx) {
-      // Determine input type for proper initialization
       let inputTypeForInit = null;
       if (el.type === 'number') {
         inputTypeForInit = 'number';
@@ -1487,7 +1430,6 @@
         inputTypeForInit = 'checkbox';
       }
 
-      // Helper: get root object for binding (context-aware)
       function getRootAndPath(key, ctx, globalState) {
         if (key.includes('.')) {
           const path = key.split('.');
@@ -1504,7 +1446,6 @@
         }
       }
 
-      // Ensure all intermediate objects exist for nested keys (context-aware)
       const { root, path } = getRootAndPath(key, ctx, this.evaluator.state);
       let ref = root;
       if (path.length > 0) {
@@ -1523,8 +1464,6 @@
           if (typeof ref[last] !== 'string') ref[last] = '';
         }
       } else if (typeof ref === 'object' && ref !== null) {
-        // No path, just root object
-        // (rare, e.g. @model="post" where post is an object)
       } else {
         if (el.type === 'number') {
           if (typeof this.evaluator.state[key] !== 'number') this.evaluator.state[key] = 0;
@@ -1550,7 +1489,6 @@
             el.value = '#000000';
           }
         } else {
-          // Fix: always set el.value as string, fallback to '' if undefined/null
           const safeVal = val == null ? '' : String(val);
           if (el.value !== safeVal) el.value = safeVal;
         }
@@ -1560,7 +1498,6 @@
       update();
 
       const handleInput = () => {
-        // Determine input type for proper initialization  
         let inputTypeForInit = null;
         if (el.type === 'number') {
           inputTypeForInit = 'number';
@@ -1568,12 +1505,10 @@
           inputTypeForInit = 'checkbox';
         }
 
-        // Use context-aware root and path for writing
         const { root, path } = getRootAndPath(key, ctx, this.evaluator.state);
         let ref = root;
         let value;
 
-        // Handle different input types
         if (el.type === 'checkbox') {
           value = el.checked;
         } else if (el.type === 'number') {
@@ -1592,15 +1527,12 @@
           const last = path[path.length - 1];
           ref[last] = value;
         } else if (typeof ref === 'object' && ref !== null) {
-          // No path, just root object
-          // (rare, e.g. @model="post" where post is an object)
         } else {
           this.evaluator.state[key] = value;
         }
         this.renderCallback();
       };
 
-      // Use appropriate event for different input types
       if (el.type === 'checkbox' || el.type === 'radio') {
         el.addEventListener('change', handleInput);
       } else {
@@ -1609,8 +1541,6 @@
     }
 
     bindValidation(el, rulesStr, modelVar = null) {
-      // Supporta: required, minLength:3, maxLength:5, email, phone, password, regex:pattern
-      // Parse rules correctly - handle regex patterns that contain commas
       const rules = [];
       let currentRule = '';
       let inRegex = false;
@@ -1635,7 +1565,6 @@
         }
       }
 
-      // Add the last rule if any
       if (currentRule.trim()) {
         rules.push(currentRule.trim());
       }
@@ -1654,7 +1583,6 @@
         let valid = true;
 
         for (const rule of rules) {
-          // Prima controlla se è una regex pura (pattern che inizia con ^ e finisce con $)
           if (/^\^.*\$$/.test(rule)) {
             try {
               const re = new RegExp(rule);
@@ -1713,7 +1641,6 @@
             }
           }
           else if (rule === 'phone') {
-            // Supporta formati: +39 123 456 7890, +39 1234567890, +391234567890
             const phoneRegex = /^\+\d{1,3}\s?\d{3,4}\s?\d{3,4}\s?\d{3,4}$/;
             if (!phoneRegex.test(el.value || '')) {
               valid = false;
@@ -1721,7 +1648,6 @@
             }
           }
           else if (rule === 'password') {
-            // Password sicura: almeno 8 caratteri, almeno una maiuscola, una minuscola, un numero e un simbolo
             const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
             if (!passwordRegex.test(el.value || '')) {
               valid = false;
@@ -1729,7 +1655,6 @@
             }
           }
           else if (rule.startsWith('regex:')) {
-            // regex:pattern oppure solo pattern se non c'è regex:
             let pattern = rule.slice(6);
             try {
               const re = new RegExp(pattern);
@@ -1767,9 +1692,6 @@
       this.modelBindings = [];
     }
   }
-
-  // ===== MAIN AYISHA CLASS =====
-
   class AyishaVDOM {
     static version = "1.0.1";
     constructor(root = document.body) {
@@ -1778,11 +1700,10 @@
       this._initBlocks = [];
       this._vdom = null;
       this._isRendering = false;
-      this._processedSetDirectives = new Set(); // Track processed @set directives
-      this._componentRenderTimeout = null; // Timeout per debounce del rendering dei componenti
-      this._setNodes = new WeakSet(); // Track real DOM nodes already initialized by @set
+      this._processedSetDirectives = new Set();
+      this._componentRenderTimeout = null;
+      this._setNodes = new WeakSet();
 
-      // Initialize modules in correct order
       this.evaluator = new ExpressionEvaluator(this.state);
       this.parser = new DOMParser(this._initBlocks);
       this.componentManager = new ComponentManager();
@@ -1815,38 +1736,29 @@
     }
 
     _runInitBlocks() {
-      // Avoid running init blocks during rendering to prevent loops
       if (this._isRendering) {
         return;
       }
 
       this._initBlocks.forEach(code => {
-        // Skip empty or whitespace-only code
         if (!code || !code.trim()) {
           return;
         }
-
-        // Clean and normalize the code while preserving JavaScript syntax
         let cleanCode = code.trim()
-          .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
-          .replace(/\r\n/g, '\n') // Normalize line endings
-          .replace(/\r/g, '\n') // Normalize line endings
-          .replace(/\n\s*\n/g, '\n') // Remove empty lines
-          .replace(/\n\s+/g, '\n') // Remove leading whitespace from lines
+          .replace(/[\u200B-\u200D\uFEFF]/g, '')
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          .replace(/\n\s*\n/g, '\n')
+          .replace(/\n\s+/g, '\n')
           .trim();
 
-        // Trasforma "foo = ..." in "state.foo = ..." solo se non già prefissato
         let transformed = cleanCode;
 
-        // Applica la trasformazione solo alle righe che non contengono parole chiave JS
         const lines = transformed.split('\n');
         const transformedLines = lines.map(line => {
           const trimmedLine = line.trim();
 
-          // Skip empty lines, comments, and control structures
           if (!trimmedLine ||
-            trimmedLine.startsWith('//') ||
-            trimmedLine.startsWith('/*') ||
             trimmedLine.startsWith('function') ||
             trimmedLine.includes('function(') ||
             trimmedLine.includes('=>') ||
@@ -1854,8 +1766,6 @@
             return line;
           }
 
-          // Transform assignment statements: "foo = ..." to "state.foo = ..."
-          // But only if not already prefixed with state, this, window, etc.
           const assignmentMatch = trimmedLine.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$/);
           if (assignmentMatch &&
             !trimmedLine.includes('state.') &&
@@ -1865,7 +1775,6 @@
             !trimmedLine.includes('localStorage.') &&
             !trimmedLine.includes('sessionStorage.')) {
             const [, varName, value] = assignmentMatch;
-            // Don't transform JavaScript globals
             const jsGlobals = ['JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp'];
             if (!jsGlobals.includes(varName)) {
               return line.replace(assignmentMatch[0], `state.${varName} = ${value}`);
@@ -1880,7 +1789,7 @@
         try {
           new Function('state', transformed)(this.state);
         } catch (e) {
-          console.error('Init error:', e, 'Original code:', code, 'Cleaned:', cleanCode, 'Transformed:', transformed);
+          console.error('Init error:', e);
         }
       });
 
@@ -1920,7 +1829,6 @@
       if (!this.state._version) this.state._version = AyishaVDOM.version;
       if (!this.state._locale) this.state._locale = (navigator.language || navigator.userLanguage || 'en');
 
-      // --- Always present: _currentBreakpoint and :screenSize ---
       const getBreakpoint = (w) => {
         if (w < 576) return 'xs';
         if (w < 768) return 'sm';
@@ -1968,26 +1876,21 @@
       const componentPromises = [];
       const processedUrls = new Set();
 
-      // Trova tutti i tag component
       const componentElements = this.root.querySelectorAll('component');
 
       componentElements.forEach(el => {
         let srcUrl = null;
 
-        // Controlla sia 'src' che '@src'
         if (el.hasAttribute('src')) {
           srcUrl = el.getAttribute('src');
         } else if (el.hasAttribute('@src')) {
           const attrValue = el.getAttribute('@src');
-          // Se è una stringa quotata, rimuovi le quote
           if (/^['\"].*['\"]$/.test(attrValue)) {
             srcUrl = attrValue.slice(1, -1);
           } else {
-            // Prova a valutare come espressione
             try {
               srcUrl = this.evaluator.evalExpr(attrValue);
             } catch (e) {
-              // Se fallisce, usa il valore raw se sembra un path
               if (attrValue.includes('.html') || attrValue.startsWith('./')) {
                 srcUrl = attrValue;
               }
@@ -1995,7 +1898,6 @@
           }
         }
 
-        // Se abbiamo un URL valido e non è già stato processato
         if (srcUrl && !processedUrls.has(srcUrl) && !this.componentManager.getCachedComponent(srcUrl)) {
           processedUrls.add(srcUrl);
           componentPromises.push(this.componentManager.loadExternalComponent(srcUrl));
@@ -2003,22 +1905,11 @@
       });
 
       if (componentPromises.length > 0) {
-        console.log(`Preloading ${componentPromises.length} components...`);
         try {
-          const results = await Promise.allSettled(componentPromises);
-          const successful = results.filter(r => r.status === 'fulfilled').length;
-          const failed = results.filter(r => r.status === 'rejected').length;
-
-          console.log(`Components preloaded: ${successful} successful, ${failed} failed`);
-
-          if (failed > 0) {
-            console.warn('Failed components:', results.filter(r => r.status === 'rejected').map(r => r.reason));
-          }
+          await Promise.allSettled(componentPromises);
         } catch (error) {
-          console.warn('Error during component preloading:', error);
+          console.error('Error during component preloading:', error);
         }
-      } else {
-        console.log('No components found to preload');
       }
     }
 
@@ -2080,7 +1971,6 @@
         }
       }
 
-      // Aggiungi gli indicatori @log come sibling prima di ripristinare lo scroll
       this._addLogIndicators();
 
       window.scrollTo(scrollX, scrollY);
@@ -2090,11 +1980,9 @@
     }
 
     _addLogIndicators() {
-      // Trova tutti gli elementi con data-ayisha-log e aggiungi i log come sibling
       const logElements = this.root.querySelectorAll('[data-ayisha-log="true"]');
 
       logElements.forEach(el => {
-        // Rimuovi eventuali log esistenti
         const existingLog = el.nextElementSibling;
         if (existingLog && existingLog.classList.contains('ayisha-log-display')) {
           existingLog.remove();
@@ -2121,11 +2009,9 @@
             line-height: 1.4 !important;
           `;
 
-          // Genera il contenuto del log usando i dati salvati
           const logContent = this._generateInlineLogContent(el, savedDirectiveInfo);
           logDisplay.innerHTML = logContent;
 
-          // Inserisci come sibling successivo
           if (el.parentNode) {
             el.parentNode.insertBefore(logDisplay, el.nextSibling);
           }
@@ -2156,7 +2042,6 @@
         `;
         errorDisplay.innerHTML = `❌ Log Error: ${errorMessage}`;
 
-        // Inserisci come sibling successivo
         if (el.parentNode) {
           el.parentNode.insertBefore(errorDisplay, el.nextSibling);
         }
@@ -2164,7 +2049,6 @@
     }
 
     _generateInlineLogContent(el, savedDirectiveInfo) {
-      // Usa le informazioni delle direttive salvate al momento della configurazione
       const vNode = {
         tag: savedDirectiveInfo.tag || el.tagName.toLowerCase(),
         directives: savedDirectiveInfo.directives || {},
@@ -2178,9 +2062,8 @@
       let hasTrackedDirectives = false;
       let directiveCount = 0;
 
-      // Processa ogni direttiva con i logger dedicati
       Object.keys(vNode.directives).forEach(directive => {
-        if (directive === '@log') return; // Non mostrare @log stesso
+        if (directive === '@log') return; 
 
         directiveCount++;
 
@@ -2196,7 +2079,6 @@
             </div>`;
           }
         } else {
-          // Direttiva non tracciata - mostra solo valore base
           html += `<div style="color: #999; margin: 2px 0;">
             <span style="color: #ccc;">${directive}</span>: 
             <span style="color: #aaa;">${this._truncateValue(vNode.directives[directive])}</span>
@@ -2205,7 +2087,6 @@
         }
       });
 
-      // Processa le sub-direttive
       Object.entries(vNode.subDirectives || {}).forEach(([directive, events]) => {
         Object.keys(events).forEach(event => {
           directiveCount++;
@@ -2242,7 +2123,6 @@
         </div>`;
       }
 
-      // Informazioni sull'elemento
       if (savedDirectiveInfo.elementInfo) {
         const info = savedDirectiveInfo.elementInfo;
         if (info.className || info.id) {
@@ -2252,7 +2132,6 @@
         }
       }
 
-      // Timestamp
       html += `<div style="color: #666; font-size: 10px; margin-top: 4px; border-top: 1px solid #333; padding-top: 2px;">
         ${new Date().toLocaleTimeString()}
       </div>`;
@@ -2275,7 +2154,6 @@
         return html;
       }
 
-      // Formato specifico per ogni tipo di direttiva
       switch (directiveType.split(':')[0]) {
         case '@for':
           html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
@@ -2432,7 +2310,6 @@
 
     _renderVNode(vNode, ctx) {
       if (!vNode) return null;
-      // Esegui @set solo se la variabile non è già definita nello stato
       if (vNode.directives && vNode.directives['@set'] && !vNode._setProcessed) {
         let setExprs = vNode.directives['@set'];
         if (Array.isArray(setExprs)) {
@@ -2444,7 +2321,6 @@
         }
         setExprs.forEach(expr => {
           try {
-            // Estrai la variabile a sinistra dell'assegnamento (es: headerExpanded = true)
             const match = String(expr).match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/);
             if (match) {
               const varName = match[1];
@@ -2455,7 +2331,6 @@
                 }
               }
             } else {
-              // fallback: esegui solo se non è un semplice assegnamento
               if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
                 const cleanExpr = String(expr).replace(/\bstate\./g, '');
                 new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
@@ -2493,11 +2368,8 @@
       if (vNode && vNode.directives) {
         for (const dir of Object.keys(vNode.directives)) {
           if (dir === '@src' && vNode.tag === 'component') continue;
-          // Allow @attr as a valid directive
           if (dir === '@attr') continue;
-          // Allow @then as a valid directive
           if (dir === '@then') continue;
-          // Allow @finally as a valid directive
           if (dir === '@finally') continue;
           if (!this.helpSystem.isValidDirective(dir)) {
             unknownDirective = dir;
@@ -2584,7 +2456,6 @@
         el.setAttribute(k, this.evaluator.evalAttrValue(v, ctx));
       });
 
-      // 1. Handle all directives except @then
       this._handleSpecialDirectives(el, vNode, ctx);
       this._handleStandardDirectives(el, vNode, ctx);
 
@@ -2595,10 +2466,8 @@
 
       this._handleSubDirectives(el, vNode, ctx);
 
-      // 2. Handle @then directives (can be multiple, separated by ;; or as array)
       if (vNode.directives && vNode.directives['@then']) {
         let thenExprs = vNode.directives['@then'];
-        // Support multiple @then separated by ;; or as array
         if (Array.isArray(thenExprs)) {
           thenExprs = thenExprs.flat().filter(Boolean);
         } else if (typeof thenExprs === 'string') {
@@ -2608,7 +2477,6 @@
         }
         thenExprs.forEach(expr => {
           try {
-            // Use the same context as @set
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
               const cleanExpr = String(expr).replace(/\bstate\./g, '');
               new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
@@ -2746,7 +2614,6 @@
           const mapExpr = vNode.directives['@map'];
           let fn;
 
-          // Handle arrow functions
           if (mapExpr.includes('=>')) {
             const [param, body] = mapExpr.split('=>').map(s => s.trim());
             fn = new Function(param.trim(), `return (${body})`);
@@ -2768,7 +2635,6 @@
           const filterExpr = vNode.directives['@filter'];
           let fn;
 
-          // Handle arrow functions
           if (filterExpr.includes('=>')) {
             const [param, body] = filterExpr.split('=>').map(s => s.trim());
             fn = new Function(param.trim(), `return (${body})`);
@@ -2841,17 +2707,10 @@
         return this.errorHandler.createErrorElement(`Error: Invalid component URL`);
       }
 
-      // Risolvi path relativi
       if (srcUrl.startsWith('./')) {
-        // Rimuovi il ./ iniziale
         srcUrl = srcUrl.substring(2);
       }
-
-      console.log(`ComponentManager: Attempting to load component from ${srcUrl}`);
-
-      // Se già in cache, mostra subito
       if (this.componentManager.getCachedComponent(srcUrl)) {
-        console.log(`ComponentManager: Component ${srcUrl} found in cache`);
         const componentHtml = this.componentManager.getCachedComponent(srcUrl);
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = componentHtml;
@@ -2867,18 +2726,13 @@
         }
       }
 
-      // Se il componente non è in cache, avvia il caricamento
       if (!this.componentManager.getCachedComponent(srcUrl)) {
-        console.log(`ComponentManager: Starting load for ${srcUrl}`);
         this.componentManager.loadExternalComponent(srcUrl).then(html => {
           if (html) {
-            console.log(`ComponentManager: Successfully loaded component ${srcUrl} (${html.length} chars)`);
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
             this._processComponentInitBlocks(tempDiv);
-            // Il caricamento è gestito dal ComponentManager
             if (!this._isRendering) {
-              // Usa un debounce per evitare troppi re-render
               clearTimeout(this._componentRenderTimeout);
               this._componentRenderTimeout = setTimeout(() => this.render(), 10);
             }
@@ -2895,7 +2749,6 @@
         });
       }
 
-      // Placeholder di caricamento più elegante
       const placeholder = document.createElement('div');
       placeholder.className = 'component-loading';
       placeholder.style.cssText = 'padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; color: #6c757d; font-size: 14px; text-align: center;';
@@ -2904,52 +2757,43 @@
     }
 
     _processComponentInitBlocks(tempDiv) {
-      // Process all init blocks in the component before parsing
       const initElements = tempDiv.querySelectorAll('init');
       const newInitBlocks = [];
 
       initElements.forEach(initEl => {
         const initContent = initEl.textContent.trim();
         if (initContent) {
-          // Check if this init block was already processed to avoid duplicates
           if (!this._initBlocks.includes(initContent)) {
             newInitBlocks.push(initContent);
             this._initBlocks.push(initContent);
           }
         }
-        // Remove the init element after processing
         initEl.remove();
       });
 
-      // Run only the new init blocks immediately (without triggering render)
       this._runInitBlocksImmediate(newInitBlocks);
     }
 
     _runInitBlocksImmediate(initBlocks) {
       initBlocks.forEach(code => {
-        // Skip empty or whitespace-only code
         if (!code || !code.trim()) {
           return;
         }
 
-        // Clean and normalize the code while preserving JavaScript syntax
         let cleanCode = code.trim()
-          .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
-          .replace(/\r\n/g, '\n') // Normalize line endings
-          .replace(/\r/g, '\n') // Normalize line endings
-          .replace(/\n\s*\n/g, '\n') // Remove empty lines
-          .replace(/\n\s+/g, '\n') // Remove leading whitespace from lines
+          .replace(/[\u200B-\u200D\uFEFF]/g, '') 
+          .replace(/\r\n/g, '\n') 
+          .replace(/\r/g, '\n') 
+          .replace(/\n\s*\n/g, '\n') 
+          .replace(/\n\s+/g, '\n') 
           .trim();
 
-        // Trasforma "foo = ..." in "state.foo = ..." solo se non già prefissato
         let transformed = cleanCode;
 
-        // Applica la trasformazione solo alle righe che non contengono parole chiave JS
         const lines = transformed.split('\n');
         const transformedLines = lines.map(line => {
           const trimmedLine = line.trim();
 
-          // Skip empty lines, comments, and control structures
           if (!trimmedLine ||
             trimmedLine.startsWith('//') ||
             trimmedLine.startsWith('/*') ||
@@ -2959,9 +2803,6 @@
             /^(if|else|for|while|switch|case|default|try|catch|finally|return|var|let|const)\b/.test(trimmedLine)) {
             return line;
           }
-
-          // Transform assignment statements: "foo = ..." to "state.foo = ..."
-          // But only if not already prefixed with state, this, window, etc.
           const assignmentMatch = trimmedLine.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$/);
           if (assignmentMatch &&
             !trimmedLine.includes('state.') &&
@@ -2971,7 +2812,6 @@
             !trimmedLine.includes('localStorage.') &&
             !trimmedLine.includes('sessionStorage.')) {
             const [, varName, value] = assignmentMatch;
-            // Don't transform JavaScript globals
             const jsGlobals = ['JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp'];
             if (!jsGlobals.includes(varName)) {
               return line.replace(assignmentMatch[0], `state.${varName} = ${value}`);
@@ -2992,14 +2832,11 @@
     }
 
     _handleNoDirective(vNode, ctx) {
-      // Create a span element to hold the raw content as text
       const span = document.createElement('span');
 
-      // Use the raw content stored during parsing
       if (vNode.rawContent !== undefined) {
         span.textContent = vNode.rawContent;
       } else {
-        // Fallback: reconstruct content without processing
         let rawContent = '';
 
         const collectTextContent = (node) => {
@@ -3008,7 +2845,6 @@
           } else if (node.type === 'text') {
             return node.content || '';
           } else if (node.tag) {
-            // Reconstruct the HTML tag with all attributes and content
             let attrs = '';
             if (node.attrs) {
               attrs = Object.entries(node.attrs)
@@ -3049,22 +2885,16 @@
     }
 
     _handleSpecialDirectives(el, vNode, ctx) {
-      // --- @set as one-time init ---
       if (vNode.directives && vNode.directives['@set']) {
-        // Create a unique identifier for this @set directive
         const setExpr = vNode.directives['@set'];
         const setId = `${vNode.tag}-${JSON.stringify(vNode.attrs)}-${setExpr}`;
-
-        // Only execute if not already processed
         if (!this._processedSetDirectives.has(setId)) {
           this._processedSetDirectives.add(setId);
 
           try {
             const expr = vNode.directives['@set'];
 
-            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
-              // Fallback to old method if helper fails
               const cleanExpr = String(expr).replace(/\bstate\./g, '');
               new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
             }
@@ -3074,12 +2904,10 @@
           }
         }
 
-        // Always remove @set from the current vNode to prevent re-execution in this render cycle
         delete vNode.directives['@set'];
       }
 
 
-      // @state
       if (vNode.directives.hasOwnProperty('@state')) {
         const wrapper = document.createElement('div');
         wrapper.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
@@ -3091,10 +2919,8 @@
 
         let stateValue = this.state;
         let titleText = 'CURRENT STATE';
-        // Check if @state has an expression (e.g. @state="foo")
         const stateExpr = vNode.directives['@state'];
         if (typeof stateExpr === 'string' && stateExpr.trim()) {
-          // Evaluate the expression in the current context
           try {
             stateValue = this.evaluator.evalExpr(stateExpr, ctx);
             titleText = `STATE: ${stateExpr}`;
@@ -3122,7 +2948,6 @@
         el.appendChild(wrapper);
       }
 
-      // @attr
       if (vNode.directives.hasOwnProperty('@attr')) {
         const wrapper = document.createElement('div');
         wrapper.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
@@ -3156,9 +2981,7 @@
         el.appendChild(wrapper);
       }
 
-      // @log come sibling invece che come figlio
       if (vNode.directives.hasOwnProperty('@log')) {
-        // Assicurati che il logger sia inizializzato
         if (!this.centralLogger || !this.centralLogger.loggers || Object.keys(this.centralLogger.loggers).length === 0) {
           console.warn('⚠️ CentralLogger not initialized, initializing now...');
           this.centralLogger.initializeLoggers(this.evaluator, this.fetchManager, this.componentManager);
@@ -3173,7 +2996,6 @@
 
           this.centralLogger.addLog(elementInfo, vNode, ctx, this.state, el);
 
-          // CORREZIONE: Salva le informazioni complete delle direttive originali
           const directiveInfo = {
             tag: vNode.tag,
             directives: { ...vNode.directives },
@@ -3184,7 +3006,6 @@
           el.setAttribute('data-ayisha-log', 'true');
           el.setAttribute('data-ayisha-log-info', JSON.stringify(directiveInfo));
 
-          // Se l'elemento ha @click, configura il logger specifico
           if (vNode.directives['@click']) {
             const clickLogger = this.centralLogger.loggers['@click'];
             if (clickLogger) {
@@ -3218,10 +3039,7 @@
 
           let processedCode = codeToRun.replace(/\bstate\./g, '');
 
-
-
           try {
-            // Handle context object operations (e.g., post.likes++, post.editing = !post.editing)
             const contextObjMatch = processedCode.match(/^(\w+)\.(\w+)(\+\+|--|=.+)$/);
             if (contextObjMatch) {
               const [, objName, propName, operation] = contextObjMatch;
@@ -3229,9 +3047,7 @@
               if (ctx && ctx[objName]) {
                 const targetObj = ctx[objName];
 
-                // Check if the target object has an id (most context objects from @for loops do)
                 if (targetObj && typeof targetObj === 'object' && targetObj.id) {
-                  // Search all state arrays for the object with matching id
                   for (const [stateKey, stateValue] of Object.entries(this.state)) {
                     if (Array.isArray(stateValue)) {
                       const index = stateValue.findIndex(item =>
@@ -3258,8 +3074,6 @@
                   }
                 }
 
-                // If no id or not found in state arrays, try direct modification
-                // This handles cases where the context object is directly from state
                 if (operation === '++') {
                   targetObj[propName] = (targetObj[propName] || 0) + 1;
                   setTimeout(() => this.render(), 0);
@@ -3278,7 +3092,6 @@
               }
             }
 
-            // Handle array filter operations (e.g., posts = posts.filter(p => p.id !== post.id))
             const filterMatch = processedCode.match(/^(\w+)\s*=\s*(\w+)\.filter\((.+)\)$/);
             if (filterMatch) {
               const [, targetVar, sourceVar, filterExpr] = filterMatch;
@@ -3291,7 +3104,6 @@
                   const varName = varMatch[1];
                   objectToDelete = ctx[varName];
                 } else {
-                  // Find any object with an id in the context (fallback)
                   for (const [ctxKey, ctxValue] of Object.entries(ctx)) {
                     if (ctxValue && typeof ctxValue === 'object' && ctxValue.id && ctxKey !== 'users') {
                       objectToDelete = ctxValue;
@@ -3355,7 +3167,6 @@
               return;
             }
 
-            // Check for multiple expressions first (semicolon-separated)
             if (processedCode.includes(';')) {
               try {
                 if (this.evaluator.executeMultipleExpressions(processedCode, ctx, e)) {
@@ -3364,15 +3175,12 @@
                 }
               } catch (multiError) {
                 console.warn('Multiple expressions handler failed:', multiError);
-                // Continue to try individual assignment handling
               }
             }
 
             const assignMatch = processedCode.match(/^(\w+)\s*=\s*(.+)$/);
             if (assignMatch) {
               const [, varName, valueExpr] = assignMatch;
-              // Skip assignment pattern if the value expression contains arrow functions
-              // Let it fall through to the generic handler
               if (valueExpr.includes('=>')) {
                 throw new Error('Assignment with arrow function, using fallback');
               }
@@ -3382,7 +3190,6 @@
               return;
             }
 
-            // Fallback to multiple expressions handler if all individual handlers fail
             try {
               if (this.evaluator.executeMultipleExpressions(processedCode, ctx, e)) {
                 return;
@@ -3391,7 +3198,6 @@
               console.warn('Multiple expressions handler also failed:', multiError);
             }
 
-            // Final fallback to single expression handlers - with render trigger
             const func = new Function('state', 'ctx', `with(state){with(ctx||{}){${processedCode}}}`);
             func(this.state, ctx || {});
             setTimeout(() => this.render(), 0);
@@ -3405,9 +3211,7 @@
         const rawExpr = vNode.directives['@hover'];
         const applyHover = e => {
           try {
-            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(rawExpr, ctx, e, true)) {
-              // Fallback to old method
               let codeToRun = rawExpr;
               if (this.evaluator.hasInterpolation(rawExpr)) {
                 codeToRun = this.evaluator.evalAttrValue(rawExpr, ctx);
@@ -3424,16 +3228,13 @@
         el.addEventListener('mouseout', applyHover);
       }
 
-      // @input directive handler
       if (vNode.directives['@input']) {
         el.addEventListener('input', e => {
           const expr = vNode.directives['@input'];
           this.evaluator.ensureVarInState(expr);
 
           try {
-            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, e, true)) {
-              // Fallback to old method
               let codeToRun = expr;
               if (this.evaluator.hasInterpolation(expr)) {
                 codeToRun = this.evaluator.evalAttrValue(expr, ctx);
@@ -3448,16 +3249,13 @@
         });
       }
 
-      // @focus directive handler
       if (vNode.directives['@focus']) {
         el.addEventListener('focus', e => {
           const expr = vNode.directives['@focus'];
           this.evaluator.ensureVarInState(expr);
 
           try {
-            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, e, true)) {
-              // Fallback to old method
               let codeToRun = expr;
               if (this.evaluator.hasInterpolation(expr)) {
                 codeToRun = this.evaluator.evalAttrValue(expr, ctx);
@@ -3472,16 +3270,13 @@
         });
       }
 
-      // @blur directive handler
       if (vNode.directives['@blur']) {
         el.addEventListener('blur', e => {
           const expr = vNode.directives['@blur'];
           this.evaluator.ensureVarInState(expr);
 
           try {
-            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, e, true)) {
-              // Fallback to old method
               let codeToRun = expr;
               if (this.evaluator.hasInterpolation(expr)) {
                 codeToRun = this.evaluator.evalAttrValue(expr, ctx);
@@ -3496,16 +3291,13 @@
         });
       }
 
-      // @change directive handler
       if (vNode.directives['@change']) {
         el.addEventListener('change', e => {
           const expr = vNode.directives['@change'];
           this.evaluator.ensureVarInState(expr);
 
           try {
-            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, e, true)) {
-              // Fallback to old method
               let codeToRun = expr;
               if (this.evaluator.hasInterpolation(expr)) {
                 codeToRun = this.evaluator.evalAttrValue(expr, ctx);
@@ -3538,14 +3330,11 @@
         try {
           const expr = vNode.directives['@text'];
 
-          // Check if this is a multiple assignment expression that should be executed
           const isMultiple = this.evaluator.hasMultipleAssignments(expr);
 
           if (isMultiple) {
-            // For multiple expressions, execute them and don't set text
             this.evaluator.executeDirectiveExpression(expr, ctx, null, false);
           } else {
-            // For single expressions, evaluate to get the text value
             const textValue = this.evaluator.evalExpr(expr, ctx);
             if (textValue === undefined) {
               el.textContent = '';
@@ -3597,8 +3386,6 @@
           this.state._currentPage = vNode.directives['@link'];
         });
       }
-
-      // RIMOSSO: la logica di esclusione per @page è ora gestita in _renderVNode
 
       if (vNode.directives['@animate']) {
         const animationClass = vNode.directives['@animate'];
@@ -3660,9 +3447,7 @@
               try {
                 const cleanCode = String(codeToRun).replace(/\bstate\./g, '');
 
-                // Try multiple expressions handler first
                 if (!this.evaluator.executeMultipleExpressions(cleanCode, ctx, e)) {
-                  // Fallback to single expression
                   new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${cleanCode}}}`)
                     (this.state, ctx, e);
                 }
@@ -3823,9 +3608,7 @@
             const state = window.ayisha.state;
             try {
               window.ayisha.evaluator.ensureVarInState(code);
-              // Use the new helper that supports multiple expressions
               if (!window.ayisha.evaluator.executeDirectiveExpression(code, {}, { newVal }, true)) {
-                // Fallback to old method
                 new Function('state', 'newVal', `with(state) { ${code} }`)(state, newVal);
               }
             } catch (e) {
@@ -3851,9 +3634,7 @@
             const state = window.ayisha.state;
             window.ayisha.evaluator.ensureVarInState(code);
             try {
-              // Use the new helper that supports multiple expressions
               if (!window.ayisha.evaluator.executeDirectiveExpression(code, {}, { newVal }, true)) {
-                // Fallback to old method
                 new Function('state', 'newVal', `with(state){ ${code} }`)(state, newVal);
               }
             } catch (e) {
@@ -3865,14 +3646,12 @@
     }
 
     mount() {
-      // First pass: process all init blocks
       this.root.childNodes.forEach(child => {
         if (child.nodeType === 1 && child.tagName && child.tagName.toLowerCase() === 'init') {
           this.parser.parse(child);
         }
       });
 
-      // Second pass: build the VDOM (excluding init blocks)
       if (this.root.childNodes.length > 1) {
         const fragVNode = { tag: 'fragment', attrs: {}, directives: {}, subDirectives: {}, children: [] };
         this.root.childNodes.forEach(child => {
@@ -3897,15 +3676,12 @@
       this._setupRouting();
       this.router.setupCurrentPageProperty();
 
-      // Precarica i componenti in background - non bloccante
       this.preloadComponents().then(() => {
-        console.log('Component preloading completed, triggering re-render');
         if (!this._isRendering) {
           this.render();
         }
       });
 
-      // Primo render immediato
       this.render();
 
       this.root.addEventListener('click', e => {
@@ -3924,10 +3700,8 @@
     }
   }
 
-  // Set up global reference
   window.AyishaVDOM = AyishaVDOM;
 
-  // Add default animation styles
   const addDefaultAnimationStyles = () => {
     const existingStyle = document.getElementById('ayisha-default-animations');
     if (!existingStyle) {

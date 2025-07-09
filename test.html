@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayisha.js Examples</title>
+    <script src="/ayisha-1.0.1.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #2d3748;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #fbbf24, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .examples-grid {
+            padding: 2rem;
+            display: grid;
+            gap: 2rem;
+        }
+
+        .example {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+
+        .example:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .example h3 {
+            color: #1f2937;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #4f46e5;
+            display: inline-block;
+        }
+
+        .example-content {
+            margin-top: 1.5rem;
+        }
+
+        /* Buttons */
+        button {
+            padding: 0.75rem 1.5rem;
+            margin: 0.25rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(107, 114, 128, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+        }
+
+        /* Inputs */
+        input, select, textarea {
+            padding: 0.75rem;
+            margin: 0.25rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            background: #f9fafb;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        /* Code blocks */
+        pre {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+
+        /* Lists */
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background: #f8fafc;
+            margin: 0.5rem 0;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid #4f46e5;
+        }
+
+        /* Utility classes */
+        .red-border { border-color: #ef4444 !important; }
+        .green-border { border-color: #10b981 !important; }
+        
+        .text-center { text-align: center; }
+        .text-success { color: #10b981; }
+        .text-error { color: #ef4444; }
+        
+        .mb-2 { margin-bottom: 1rem; }
+        .mt-2 { margin-top: 1rem; }
+        
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hide init tags */
+        init { display: none !important; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            .header { padding: 2rem 1rem; }
+            .header h1 { font-size: 2rem; }
+            .examples-grid { padding: 1rem; }
+            .example { padding: 1.5rem; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Ayisha.js</h1>
+            <p>Interactive examples showcasing all Ayisha.js features</p>
+        </div>
+
+        <div class="examples-grid">
+            <!-- Global State Initialization -->
+            <init>
+                state.name = 'World';
+                state.count = 0;
+                state.showMessage = false;
+                state.userType = 'guest';
+                state.items = [
+                    { id: 1, name: 'Apple', price: 1.50 },
+                    { id: 2, name: 'Banana', price: 0.80 },
+                    { id: 3, name: 'Orange', price: 1.20 }
+                ];
+                state.newItem = '';
+                state.userId = 1;
+                state.email = '';
+                state.password = '';
+                state.age = '';
+                state.numbers = [1,2,3,4,5,6,7,8,9,10];
+                state.showBox = false;
+                state.watchedValue = 'Hello';
+                state.log = [];
+                state.isActive = false;
+                state.textColor = '#4f46e5';
+                state.fontSize = 16;
+                state.user = { nome: 'John', cognome: 'Doe', email: 'john@example.com', eta: 25 };
+            </init>
+
+            <!-- 1. Basic Reactivity -->
+            <div class="example">
+                <h3>1. Basic Reactivity & Data Binding</h3>
+                <div class="example-content">
+                    <p>Hello, <strong @text="name"></strong>!</p>
+                    <input @model="name" placeholder="Enter your name">
+                    <p>Live count: <strong @text="count"></strong></p>
+                    <button @click="count++" class="btn-primary">Increment</button>
+                    <button @click="count--" class="btn-secondary">Decrement</button>
+                    <button @click="count=0" class="btn-danger">Reset</button>
+                </div>
+            </div>
+
+    <!-- Conditional Rendering -->
+    <div class="example">
+        <h3>2. Conditional Rendering</h3>
+        <init>
+            state.showMessage = false;
+            state.userType = 'guest';
+        </init>
+
+        <button @click="showMessage = !showMessage" class="primary">
+            Toggle Message (@if)
+        </button>
+
+        <div @if="count>=5">
+             <div @if="name!=='Ben'">
+                 <p>🎉 Wow! you count 5 and more</p>
+                  <div @if="userType=='user'">
+                 <p>🎉 Wow! you're and User'</p>
+                  </div>
+             </div>
+             <div @if="name=='Ben'">
+                 <p>🎉 Hello Ben you count 5 and more</p>
+             </div>
+        </div>
+        
+        <div @if="showMessage">
+            <p>🎉 This message appears conditionally!</p>
+        </div>
+        <div @if="showMessage">
+            <p>🎉 This message appears conditionally!</p>
+        </div>
+
+        <p @show="showMessage">This uses @show (display: none)</p>
+
+        <hr>
+
+        <select @model="userType">
+            <option value="guest">Guest</option>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+            <option value="ds">Other</option>
+        </select>
+
+        <div @switch="userType">
+            <div @case="guest">Welcome, Guest! Please log in.</div>
+            <div @case="user">Hello, User! You have access.<p @if="name=='World'">Ciao Mondo</p>
+            </div>
+            <div @case="admin" class="bg-red">Hi, Admin! You have full control.</div>
+            <div @default>
+                <p>Unknown user type</p>
+            </div>
+        </div>
+    </div>
+
+
+    <div @if="userType=='user'">
+        Questo è visibile solo ad un user
+    </div>
+
+
+     <div @show="userType=='admin'">
+        Questo è visibile solo ad un admin
+    </div>
+
+    {{userType}}
+
+
+    <!-- Lists and Iteration -->
+    <div class="example">
+        <h3>3. Lists & Iteration</h3>
+        <init>
+            // Only initialize if not already present
+            if (!state.items || state.items.length === 0) {
+            state.items = [
+            { id: 1, name: 'Apple', price: 1.50 },
+            { id: 2, name: 'Banana', price: 0.80 },
+            { id: 3, name: 'Orange', price: 1.20 }
+            ];
+            }
+            if (!state.newItem) {
+            state.newItem = '';
+            }
+        </init>
+
+        <input @model="newItem" placeholder="Add new item">
+        <button
+            @click="state.items.push({id: Date.now(), name: state.newItem, price: Math.random() * 5}); state.newItem = ''"
+            class="primary">
+            Add Item
+        </button>
+
+        <ul>
+            <li @for="i, item in items" @key="item.id">
+                <span @text="item.name"></span> - $<span @text="item.price.toFixed(2)"></span>
+                <button @click="items = items.filter(i => i.id !== item.id)"
+                    style="margin-left: 10px;">Remove {{i}}</button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- HTTP Requests -->
+    <div class="example">
+        <h3>4. HTTP Requests & Data Fetching</h3>
+       
+
+        <div @fetch="https://jsonplaceholder.typicode.com/users/1" @result="users" @log></div>
+
+        
+        
+        <div @watch="userId=>userUrl=`https://jsonplaceholder.typicode.com/users/${userId}`" >
+            URL --->  {{userUrl || ''}}
+        </div>
+        
+        <input type="number" @model="userId" min="1" max="10" @log>
+        <button @click="userId=userId*1+1" class="primary">Incrementa userId</button>
+
+        <!-- Debug info -->
+        <p>Debug - currentUser exists: <span @text="!!currentUser"></span></p>
+        <p>Debug - currentUser type: <span @text="typeof currentUser"></span></p>
+
+        <div @if="currentUser" >
+            <h4>User Details:</h4>
+            <p>Name: <span @text="currentUser.name || 'N/A'"></span></p>
+            <p>Email: <span @text="currentUser.email || 'N/A'"></span></p>
+            <p>Website: <span @text="currentUser.website || 'N/A'"></span></p>
+
+            <p>INSIDE IF ---> <span @text="currentUser.name"></span></p>
+        </div>
+        <p>OUTSIDE IF ---> <span @text="currentUser.name"></span></p>
+
+    </div>
+    <div class="example">
+        <h3>4. HTTP Requests & Data Fetching with watch</h3>
+        <input type="number" @model="userId" min="1" max="10">
+        <div @fetch="https://jsonplaceholder.typicode.com/users/{userId}" @result="currentUser" @watch="userId">
+        </div>
+    </div>
+
+    <!-- Form Validation -->
+    <div class="example">
+        <h3>5. Form Validation</h3>
+        <init>
+            state.email = '';
+            state.password = '';
+            state.age = '';
+            // Initialize validation state
+            state.email_valid = false;
+            state.password_valid = false;
+            state.age_valid = false;
+        </init>
+
+        <form>
+            <div>
+                <label>Email:</label><br>
+                <input type="email" @model="email" @validate="required" placeholder="your@email.com">
+            </div>
+
+          --->   {{_validate.email}}
+
+            <div>
+                <label>Password:</label><br>
+                <input type="password" @model="password" @validate="required|min:6" placeholder="At least 6 characters">
+            </div>
+
+            <div>
+                <label>Age:</label><br>
+                <input type="text" @model="age" @validate="required|number" placeholder="Enter your age">
+            </div>
+
+            <button type="submit" @click="console.log('Form submitted!')"
+                @class="{primary: email_valid && password_valid && age_valid}">
+                Submit
+            </button>
+        </form>
+    </div>
+
+    <!-- Functional Programming -->
+    <div class="example">
+        <h3>6. Functional Programming</h3>
+        <init>
+            state.numbers = [1,2,3,4,5,6,7,8,9,10];
+        </init>
+
+
+        <!-- Map: square each number -->
+        <div @source="numbers" @map="item * item" @result="squares"></div>
+        <!-- Filter: only even numbers -->
+        <div @source="numbers" @filter="item % 2 === 0" @result="evenNumbers"></div>
+        <!-- Reduce: sum all numbers -->
+        <div @source="numbers" @reduce="acc,item => acc + item" @initial="0" @result="sum"></div>
+
+
+        <p>Original: <span @text="numbers.join(', ')"></span></p>
+        <p>Squared: <span @text="squares.join(', ')"></span></p>
+        <p>Even numbers: <span @text="evenNumbers.join(', ')"></span></p>
+        <p>Sum: <span @text="sum"></span></p>
+    </div>
+
+    <!-- Animations -->
+    <div class="example">
+        <h3>7. Animations</h3>
+        <init>
+            state.showBox = false;
+        </init>
+
+        <button @click="state.showBox = !state.showBox" class="primary">
+            Toggle Box
+        </button>
+
+        <div @if="showBox" @animate="fadeIn" style="width: 100px; height: 100px; background: #007bff; margin: 10px;">
+        </div>
+    </div>
+
+    <!-- Components -->
+    <div class="example">
+        <h3>8. Component System</h3>
+        <init>
+            // Register a component
+            ayisha.component('user-card', {
+            template: `
+            <div style="border: 1px solid #ddd; padding: 15px; margin: 10px; border-radius: 8px;">
+                <h4>{{name}}</h4>
+                <p>{{email}}</p>
+                <p>{{website}}</p>
+            </div>
+            `,
+            mounted(context) {
+            console.log('User card mounted with:', context);
+            }
+            });
+
+            state.user = { name: 'John Doe', email: 'john@example.com', website: 'johndoe.com' };
+        </init>
+
+        <div @component="user-card" prop-name="user.name" prop-email="user.email" prop-website="user.website">
+        </div>
+    </div>
+
+    <!-- Watchers -->
+    <div class="example">
+        <h3>9. Watchers</h3>
+        <init>
+            state.watchedValue = 'Hello';
+            state.log = [];
+        </init>
+
+        <div @watch="watchedValue: state.log.push('Value changed to: ' + newVal)"></div>
+
+        <input @model="watchedValue" placeholder="Type something to trigger watcher">
+
+        <h4>Watcher Log:</h4>
+        <ul>
+            <li @for="entry in log" @text="entry"></li>
+        </ul>
+    </div>
+
+    <!-- SPA Router -->
+    <div class="example">
+        <h3>11. SPA Router</h3>
+        <nav>
+            <a href="#" @link="/home">Home</a> |
+            <a href="#" @link="/about">About</a> |
+            <a href="#" @link="/contact">Contact</a>
+        </nav>
+
+        <div @page=""></div>
+
+        <p>Current page: <span @text="currentPage"></span></p>
+    </div>
+
+    <!-- Dynamic Styling -->
+    <div class="example">
+        <h3>12. Dynamic Styling</h3>
+        <init>
+            state.isActive = false;
+            state.textColor = '#000000';
+            state.fontSize = 16;
+        </init>
+
+        <button @click="state.isActive = !state.isActive" class="primary">
+            Toggle Active State
+        </button>
+
+        <input type="color" @model="textColor">
+        <input type="range" @model="fontSize" min="12" max="24">
+
+        <div @class="{active: isActive, inactive: !isActive}"
+            @style="{color: textColor, fontSize: fontSize + 'px', padding: '20px', border: '1px solid #ddd', margin: '10px 0'}"
+            @text="'I am ' + (isActive ? 'active' : 'inactive') + ' with dynamic styling!'">
+        </div>
+
+        <style>
+            .active {
+                background-color: #d4edda;
+            }
+
+            .inactive {
+                background-color: #f8d7da;
+            }
+        </style>
+    </div>
+
+    <!-- Sub-direttive: esempi pratici per un blog -->
+    <div class="example">
+        <h3>13. Sub-direttive (@direttiva:evento) - Blog Demo</h3>
+        <init>
+            // Initialize posts array if not exists
+            if (!state.posts) {
+                state.posts = [
+                    {id: 1, title: 'Primo Post', content: 'Contenuto del primo post', likes: 5, editing: false},
+                    {id: 2, title: 'Secondo Post', content: 'Contenuto del secondo post', likes: 3, editing: false}
+                ];
+            }
+            state.newTitle = '';
+            state.newContent = '';
+            state.filter = '';
+            state.editTitle = '';
+            state.editContent = '';
+            doble = false;
+        </init>
+
+        <h4>Aggiungi un nuovo post</h4>
+        <input @model="newTitle" placeholder="Titolo">
+        <input @model="newContent" placeholder="Contenuto">
+        <button @click="posts.push({id: Date.now(), title: newTitle, content: newContent, likes: 0, editing: false}); newTitle=''; newContent='';">Aggiungi Post</button>
+
+        <h4>Filtra post per titolo</h4>
+        <input @model="filter" placeholder="Filtra per titolo">
+
+        <ul>
+            <li @for="post in posts.filter(p => !filter || p.title.toLowerCase().includes(filter.toLowerCase()))" @key="post.id">
+                <b @text="post.title"></b>
+                <p @text="post.content"></p>
+                <span>Likes: <span @text="post.likes"></span></span>
+                <button @click="post.likes++">Like</button>
+                <button @click="post.editing = !post.editing">Modifica</button>
+                <button @click="posts = posts.filter(p => p.id !== post.id)">Elimina</button>
+                <div @if="post.editing">
+                    <input @model="editTitle" :value="post.title" @focus="editTitle=post.title">
+                    <input @model="editContent" :value="post.content" @focus="editContent=post.content">
+                    <button @click="post.title=editTitle; post.content=editContent; post.editing=false">Salva</button>
+                </div>
+            </li>
+        </ul>
+ecco for
+         <ul>
+            <li @for="index, post in posts" @text="entry">{{index}}</li>
+        </ul>
+
+        <h4>Sub-direttive: tutte le combinazioni</h4>
+        <button @fetch:click="https://jsonplaceholder.typicode.com/posts/1" @result="fetchResult">Carica post remoto (fetch solo su click)</button>
+        <pre @text="JSON.stringify(fetchResult, null, 2)"></pre>
+
+        {{fetchResult.title}}
+
+        <input @model:input="filter" placeholder="Filtra solo su input">
+        <input @model:change="filter" placeholder="Filtra solo su change">
+
+        <input @set:change="filter='reset'">
+        <button @set:click="filter=''">Reset filtro</button>
+
+        <div @text:hover="'Passa il mouse per vedere questo testo'" style="border:1px solid #ccc; padding:10px; width:300px;">Testo statico</div>
+        <div @text:click="'Hai cliccato!'" style="border:1px solid #ccc; padding:10px; width:300px;">Clicca qui</div>
+
+        <input @class:focus="{ 'red-border': true }" placeholder="Focus per bordo rosso">
+        <input @class:input="{ 'green-border': true }" placeholder="Input per bordo verde">
+        <div @class:hover="{'red-border': true}" style="border:1px solid #ccc; padding:10px; width:300px;">Hover per bordo rosso</div>
+        <div @class:click="{ 'green-border': true }" style="border:1px solid #ccc; padding:10px; width:300px;">Click per bordo verde</div>
+
+        <input @model="selectedPost">
+        <button @click="selectedPost='null'">Deseleziona</button>
+        <div @if="selectedPost">
+            <h4>Post selezionato: <span @text="selectedPost"></span></h4>
+        </div>
+    </div>
+
+    <h2></h2>
+    <div @state></div>
+<button @click="state.foo = (state.foo||0)+1">Aumenta foo</button>
+
+    <!-- Anagrafica User Form Example -->
+    <div class="example">
+        <h3>14. Form Anagrafica Utente</h3>
+        <init>
+            // Stato iniziale user
+            state.user = state.user || { nome: '', cognome: '', email: '', eta: '' };
+            state.userForm = { nome: '', cognome: '', email: '', eta: '' };
+        </init>
+        <form>
+            <div>
+                <label>Nome:</label><br>
+                <input @model="user.nome" placeholder="Nome" required>
+            </div>
+            <div>
+                <label>Cognome:</label><br>
+                <input @model="user.cognome" placeholder="Cognome" required>
+            </div>
+            <div>
+                <label>Email:</label><br>
+                <input type="email" @model="user.email" placeholder="Email" required>
+            </div>
+            <div>
+                <label>Età:</label><br>
+                <input type="number" @model="user.eta" placeholder="Età" min="0" required>
+            </div>
+            <div type="submit" class="primary" >Salva Anagrafica</div>
+        </form>
+        <h4>Dati utente inseriti:</h4>
+        <init>
+            state.user = { nome: 'Benito', cognome: 'Massidda', email: '', eta: '' };
+        </init>
+        <ul>
+            <li><b>Nome:</b> <span @text="user.nome"></span></li>
+            <li><b>Cognome:</b> <span @text="user.cognome"></span></li>
+            <li><b>Email:</b> <span @text="user.email"></span></li>
+            <li><b>Età:</b> <span @text="user.eta"></span></li>
+        </ul>
+    </div>
+
+</body>
+
+</html>
