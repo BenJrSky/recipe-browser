@@ -207,6 +207,19 @@
 </head>
 
 <body>
+    <init>
+        test = 1;
+        animal= 'cat';
+    </init>
+    <div @set="test=2">test</div>
+    <button @set:click="test=3">click</button>
+
+    <div @set:click="animal='dog'">cane</div>
+    <span @state="test"></span>
+    <span @state="animal"></span>
+
+
+
     <div class="container">
         <div class="header">
             <h1>🚀 Ayisha.js</h1>

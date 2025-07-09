@@ -92,50 +92,254 @@ The execution order of directives on a node follows this hierarchy (from top to 
 
 ---
 
-### **Ayisha.js Directives List**
+| Directive | Description | Usage / Example |
+|-----------|-------------|-------------------------|
+| `@if` | Shows the node only if the condition is true | `<div @if="condition">Visible if true</div>` |
+| `@show` | Shows the node if the condition is true (like @if, but does not remove from DOM) | `<div @show="condition">Show if true</div>` |
+| `@hide` | Hides the node if the condition is true | `<div @hide="condition">Hide if true</div>` |
+| `@for` | Repeats the node for each item in a list | `<li @for="item in items">{{item}}</li>` |
+| `@when` | Watches a condition and triggers @do or @go when it becomes true (only on transition from false to true) | `<span @when="_currentPage=='home'" @do="step='004'"></span>` |
+| `@do` | Executes an expression when the associated @when condition becomes true | `<span @when="_currentPage=='random'" @do="step='001'"></span>` |
+| `@go` | Navigates to a page (SPA style) when the associated @when condition becomes true, or on click. The value is the page name (string or variable) | `<span @when="_currentPage=='categories'" @go="random"></span>` |
+| `@wait` | Delays the execution of @do or @go by the specified milliseconds after the @when condition becomes true | `<span @when="_currentPage=='search'" @wait="2000" @do="step='003'"></span>` |
+| `@model` | Two-way binding between input and state | `<input @model="name">` |
+| `@validate` | Apply validation rules to input | `<input @validate="required,minLength:3">` |
+| `@click` | Execute code on click | `<button @click="state.count++">Increment</button>` |
+| `@input` | Execute code on input | `<input @input="foo=1">` |
+| `@focus` | Execute code on focus | `<input @focus="foo=1">` |
+| `@blur` | Execute code on blur | `<input @blur="foo=1">` |
+| `@change` | Execute code on change | `<input @change="foo=1">` |
+| `@hover` | Execute code on hover | `<div @hover="foo=1"></div>` |
+| `@set` | Assign values to state on event | `<button @set:click="foo=1"></button>` |
+| `@fetch` | Perform a fetch (API call) | `<div @fetch="'url'" @result="data"></div>` |
+| `@result` | Target variable for @fetch result | `<div @fetch="'url'" @result="data"></div>` |
+| `@source` | Data source for transformations | `<div @source="items" @map="value*2" @result="double"></div>` |
+| `@map` | Transform a list | `<div @source="items" @map="value*2"></div>` |
+| `@filter` | Filter a list | `<div @source="items" @filter="value > 0"></div>` |
+| `@reduce` | Reduce a list to a value | `<div @source="items" @reduce="acc+value" @initial="0"></div>` |
+| `@initial` | Initial value for @reduce | `<div @source="items" @reduce="..." @initial="0"></div>` |
+| `@component` | Load an external component | `<component @src="comp.html"></component>` |
+| `@src` | URL of the external component | `<component @src="comp.html"></component>` |
+| `@link` | SPA navigation | `<a @link="page">Go</a>` |
+| `@page` | Shows the node only on a specific page | `<div @page="home">Only on home</div>` |
+| `@key` | Unique identifier for @for loops | `<li @for="item in items" @key="item.id"></li>` |
+| `@switch` | Switch on a value | `<div @switch="value"><div @case="1">One</div><div @default>Other</div></div>` |
+| `@case` | Case for @switch | `<div @case="1">One</div>` |
+| `@default` | Default for @switch | `<div @default>Other</div>` |
+| `@animate` | Apply CSS animation | `<div @animate="fade-in"></div>` |
+| `@state` | Show current state as JSON | `<div @state></div>` |
+| `@log` | Show directive logs on the element | `<div @log></div>` |
+| `@text` | Update the node's text | `<span @text="name"></span>` |
+| `no` | Disable interpolation | `<no>{{name}}</no>` |
+| `@then` | Execute code after all other directives | `<div @then="foo=1;;bar=2"></div>` |
+| `@finally` | Execute code after everything, including @then | `<div @finally="foo=1;;bar=2"></div>` |
 
-| Directive         | Description | Usage / Example |
-|-------------------|-------------|-------------------------|
-| `@if`             | Show the node only if the condition is true | `<div @if="condition">Visible if true</div>` |
-| `@show`           | Show the node if the condition is true (like @if, but does not remove from DOM) | `<div @show="condition">Show if true</div>` |
-| `@hide`           | Hide the node if the condition is true | `<div @hide="condition">Hide if true</div>` |
-| `@for`            | Repeat the node for each item in a list | `<li @for="item in items">{{item}}</li>` |
-| `@when`           | Watches a condition and triggers `@do` or `@go` when it becomes true (only on transition from false to true). | `<span @when="_currentPage=='home'" @do="step='004'"></span>` |
-| `@do`             | Executes an expression when the associated `@when` condition becomes true. | `<span @when="_currentPage=='random'" @do="step='001'"></span>` |
-| `@go`             | Navigates to a page (SPA style) when the associated `@when` condition becomes true, or on click. The value is the page name (string or variable). | `<span @when="_currentPage=='categories'" @go="random"></span>` |
-| `@wait`           | Delays the execution of `@do` or `@go` by the specified milliseconds after the `@when` condition becomes true. | `<span @when="_currentPage=='search'" @wait="2000" @do="step='003'"></span>` |
-| `@model`          | Two-way binding between input and state | `<input @model="name">` |
-| `@validate`       | Apply validation rules to input | `<input @validate="required,minLength:3">` |
-| `@click`          | Execute code on click | `<button @click="state.count++">Increment</button>` |
-| `@input`          | Execute code on input | `<input @input="doSomething()">` |
-| `@focus`          | Execute code on focus | `<input @focus="doSomething()">` |
-| `@blur`           | Execute code on blur | `<input @blur="doSomething()">` |
-| `@change`         | Execute code on change | `<input @change="doSomething()">` |
-| `@hover`          | Execute code on hover | `<div @hover="doSomething()"></div>` |
-| `@set`            | Assign values to state on event | `<button @set:click="foo=1"></button>` |
-| `@fetch`          | Perform a fetch (API call) | `<div @fetch="'url'" @result="data"></div>` |
-| `@result`         | Target variable for @fetch result | `<div @fetch="'url'" @result="data"></div>` |
-| `@source`         | Data source for transformations | `<div @source="items" @map="item => item*2" @result="double"></div>` |
-| `@map`            | Transform a list | `<div @source="items" @map="item => item*2"></div>` |
-| `@filter`         | Filter a list | `<div @source="items" @filter="item > 0"></div>` |
-| `@reduce`         | Reduce a list to a value | `<div @source="items" @reduce="(acc, item) => acc+item" @initial="0"></div>` |
-| `@initial`        | Initial value for @reduce | `<div @source="items" @reduce="..." @initial="0"></div>` |
-| `@component`      | Load an external component | `<component @src="comp.html"></component>` |
-| `@src`            | URL of the external component | `<component @src="comp.html"></component>` |
-| `@link`           | SPA navigation | `<a @link="page">Go</a>` |
-| `@page`           | Show the node only on a specific page | `<div @page="home">Only on home</div>` |
-| `@key`            | Unique identifier for @for loops | `<li @for="item in items" @key="item.id"></li>` |
-| `@switch`         | Switch on a value | `<div @switch="value"><div @case="1">One</div><div @default>Other</div></div>` |
-| `@case`           | Case for @switch | `<div @case="1">One</div>` |
-| `@default`        | Default for @switch | `<div @default>Other</div>` |
-| `@animate`        | Apply CSS animation | `<div @animate="fade-in"></div>` |
-| `@state`          | Show current state as JSON | `<div @state></div>` |
-| `@log`            | Show directive logs on the element | `<div @log></div>` |
-| `@text`           | Update the node's text | `<span @text="name"></span>` |
-| `no`              | Disable interpolation | `<no>{{name}}</no>` |
-| `@then`           | Execute code after all other directives | `<div @then="foo=1;;bar=2"></div>` |
-| `@finally`        | Execute code after everything, including @then | `<div @finally="foo=1;;bar=2"></div>` |
 
+
+## 📖 **Ayisha.js Directives: Functionality, Use Cases, Best Practices & Examples**
+
+For each Ayisha.js directive and sub-directive, here is a detailed reference guide:
+
+### `@if`
+**Functionality:** Shows the node only if the condition is true. The node is removed from the DOM if the condition is false.
+**Use cases:** Show/hide sections based on state, e.g. error messages, loading, etc.
+**Best practices:** Use to control real DOM presence, not just visibility.
+**Example:**
+```html
+<div @if="isLoggedIn">Welcome!</div>
+```
+
+### `@show`
+**Functionality:** Shows the node if the condition is true, but does not remove it from the DOM (uses `display:none`).
+**Use cases:** Temporarily hide elements while keeping state/events.
+**Best practices:** Use when you need to keep the node's internal state.
+**Example:**
+```html
+<div @show="menuOpen">Menu</div>
+```
+
+### `@hide`
+**Functionality:** Hides the node if the condition is true (`display:none`).
+**Use cases:** Hide elements without removing them from the DOM.
+**Best practices:** Use for elements that may reappear.
+**Example:**
+```html
+<div @hide="loading">Content</div>
+```
+
+### `@for`
+**Functionality:** Repeats the node for each item in a list.
+**Use cases:** Lists of objects, rendering dynamic arrays.
+**Best practices:** Always use `@key` if possible for performance and stability.
+**Example:**
+```html
+<li @for="item in items" @key="item.id">{{item.name}}</li>
+```
+
+### `@when`, `@do`, `@go`, `@wait`
+**Functionality:**
+- `@when` observes a condition and triggers `@do` or `@go` only when it transitions from false to true.
+- `@do` executes an expression when triggered by `@when`.
+- `@go` navigates to a page when triggered by `@when` or on click.
+- `@wait` adds a delay (ms) before executing `@do` or `@go`.
+**Use cases:** Guided flows, onboarding, automatic redirects, sequential steps.
+**Best practices:** Use for reactive logic and state transitions.
+**Example:**
+```html
+<span @when="!isLoggedIn" @go="login"></span>
+<span @when="_currentPage=='random'" @wait="3000" @go="home"></span>
+```
+
+### `@model`
+**Functionality:** Two-way binding between input and state.
+**Use cases:** Forms, search fields, dynamic inputs.
+**Best practices:** Use to sync state with user input.
+**Example:**
+```html
+<input @model="searchQuery">
+```
+
+### `@validate`
+**Functionality:** Applies validation rules to input.
+**Use cases:** Forms with required fields, live validation.
+**Best practices:** Combine with `@model` for reactive UX.
+**Example:**
+```html
+<input @model="email" @validate="required,email">
+```
+
+### `@click`, `@input`, `@focus`, `@blur`, `@change`, `@hover`
+**Functionality:** Handle user events and execute associated code.
+**Use cases:** Buttons, inputs, dynamic interactions.
+**Best practices:** Keep inline code simple, delegate complex logic to state functions.
+**Example:**
+```html
+<button @click="counter++">Increase</button>
+<input @input="counter++">
+```
+
+### `@set`
+**Functionality:** Assigns values to state on a specific event. You can assign multiple variables at once, use expressions, and it works like an inline `<init>` block for state updates.
+**Use cases:** Toggle, reset, batch assignments, quick state changes from UI events.
+**Best practices:** Use for simple or batch state updates, keep logic clear and concise.
+**Example:**
+```html
+<button @set:click="foo=1; bar='ok'; count=count+1"></button>
+```
+
+### `@fetch`, `@result`
+**Functionality:**
+- `@fetch` performs an API call (can be event-bound).
+- `@result` receives the fetch result.
+**Use cases:** Loading data from APIs, async state updates.
+**Best practices:** Manage loading/error in state, use `@if` for user feedback.
+**Example:**
+```html
+<div @fetch="'https://api.com/data'" @result="data"></div>
+```
+
+### `@source`, `@map`, `@filter`, `@reduce`, `@initial`
+**Functionality:**
+- `@source` defines the data source.
+- `@map` transforms each item.
+- `@filter` filters the list.
+- `@reduce` reduces the list to a value.
+- `@initial` initial value for reduce.
+**Use cases:** Array transformations, aggregations, dynamic filters.
+**Best practices:** Combine for reactive data pipelines.
+**Example:**
+```html
+<div @source="items" @filter="item.active" @map="item => item.value" @result="activeValues"></div>
+```
+
+### `@component`, `@src`
+**Functionality:** Loads external components or HTML templates.
+**Use cases:** Modular layouts, UI reuse, component-based architecture.
+**Best practices:** Organize components in dedicated folders, use clear names.
+**Example:**
+```html
+<component @src="./components/header.html"></component>
+```
+
+### `@link`
+**Functionality:** SPA navigation between defined pages.
+**Use cases:** Menus, breadcrumbs, internal links.
+**Best practices:** Always use for internal navigation, not `<a href>`.
+**Example:**
+```html
+<a @link="home">Home</a>
+```
+
+### `@page`
+**Functionality:** Shows the node only on a specific page.
+**Use cases:** Conditional rendering of components/pages.
+**Best practices:** Use for declarative SPA routing.
+**Example:**
+```html
+<div @page="search">Only on search</div>
+```
+
+### `@key`
+**Functionality:** Unique identifier for nodes in `@for` loops.
+**Use cases:** Dynamic lists, performance, animations.
+**Best practices:** Always use a stable, unique key.
+**Example:**
+```html
+<li @for="item in items" @key="item.id">{{item.name}}</li>
+```
+
+### `@switch`, `@case`, `@default`
+**Functionality:** Declarative switch-case for multi-conditional rendering.
+**Use cases:** UI with multiple states, menus, tabs.
+**Best practices:** Use to avoid deeply nested `@if`.
+**Example:**
+```html
+<div @switch="status">
+  <div @case="'loading'">Loading...</div>
+  <div @case="'error'">Error!</div>
+  <div @default>Ready</div>
+</div>
+```
+
+### `@animate`
+**Functionality:** Applies CSS animation classes to the node.
+**Use cases:** Transitions, visual feedback, micro-interactions.
+**Best practices:** Use animation classes defined in CSS.
+**Example:**
+```html
+<div @animate="fade-in"></div>
+```
+
+### `@state`
+**Functionality:** Shows the entire current state as JSON. If you use `state="attribute"`, it shows the value of the given attribute or expression (e.g. `state="user"` shows the user object, `state="user.name"` shows the user's name).
+**Use cases:** Debugging, inspecting specific state objects or values.
+**Best practices:** Remove from production, use for development and troubleshooting.
+**Example:**
+```html
+<div @state></div>
+<div @state="user"></div>
+<div @state="user.name"></div>
+```
+
+### `@attr`
+**Functionality:** Shows the list of all state attributes (keys) as an array.
+**Use cases:** Debugging, dynamic UIs, meta-programming.
+**Best practices:** Use for development or advanced UI scenarios.
+**Example:**
+```html
+<div @attr></div>
+```
+
+### `@then` / `@finally`
+**Functionality:**
+- `@then` runs code after all other directives on the node.
+- `@finally` runs code after everything, including `@then`.
+**Use cases:** Side-effects, synchronization, cleanup.
+**Best practices:** Use for logic that depends on all other directives.
+**Example:**
+```html
+<div @then="counter++" @finally="modalOpen=false"></div>
+```
 #### **Practical Examples for @when, @do, @go, @wait**
 
 ```html
@@ -284,8 +488,9 @@ recipe-browser/
 <!-- Conditional pages -->
 <component @src="./pages/home.html" @page="home"></component>
 <component @src="./pages/categories.html" @page="categories"></component>
-```
+<component @src="./pages/search.html" @page="search"></component>
 
+```
 **📝 What you'll learn:**
 - `@link` directive for navigation
 - `@page` directive for conditional page rendering

@@ -2508,20 +2508,21 @@
         }
         setExprs.forEach(expr => {
           try {
-            const match = String(expr).match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/);
-            if (match) {
+            // Find all variable names being assigned in the expression
+            // Handles multiple assignments: foo=1, bar=2, baz='hi'
+            const assignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g;
+            let match;
+            while ((match = assignmentRegex.exec(expr)) !== null) {
               const varName = match[1];
-              if (typeof this.state[varName] === 'undefined') {
-                if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
-                  const cleanExpr = String(expr).replace(/\bstate\./g, '');
-                  new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
-                }
+              if (!(varName in this.state)) {
+                // Make the variable reactive (undefined by default)
+                this.state[varName] = undefined;
               }
-            } else {
-              if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
-                const cleanExpr = String(expr).replace(/\bstate\./g, '');
-                new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
-              }
+            }
+            // Now execute the assignment(s)
+            if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
+              const cleanExpr = String(expr).replace(/\bstate\./g, '');
+              new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
             }
           } catch (e) {
             console.error('Error in @set directive:', e, 'Expression:', expr);
