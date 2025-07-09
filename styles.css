@@ -253,6 +253,12 @@ body {
 }
 
 @media (max-width: 480px) {
+    .footer {
+        padding-bottom: 2.5rem;
+    }
+    .footer-bottom {
+        margin-bottom: 1.5rem;
+    }
     .header h1 {
         font-size: 1.6rem;
     }

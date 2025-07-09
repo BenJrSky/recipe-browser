@@ -1,5 +1,5 @@
     <nav @show="headerExpanded" class="nav">
-        <div class="nav-container">
+        <div class="nav-container" @click="_screenSize <= 768 ? headerExpanded=!headerExpanded : null" >
             <a href="#" @link="home" @class="{'nav-link': true, 'active': _currentPage === 'home'}">⌂ Home</a>
             <a href="#" @link="categories" @class="{'nav-link': true, 'active': _currentPage === 'categories'}">⊞ Categories</a>
             <a href="#" @link="search" @class="{'nav-link': true, 'active': _currentPage === 'search'}">⊙ Search</a>

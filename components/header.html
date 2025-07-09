@@ -1,8 +1,5 @@
 
 
-<div @set="hello='ciao Ben'"></div>
-
-<p @state>{{hello}}</p>
 
 <span @switch="_currentPage"  @set="headerExpanded = true"> 
 
@@ -17,7 +14,6 @@
             <div class="header-content" @class="expanded: headerExpanded">
                 <h1>◉ Recipe Browser</h1>
                 <p>Discover delicious recipes from around the world</p>
-                <p @if="headerExpanded" style="color: red; font-size: 12px;">DEBUG: Menu is expanded</p>
             </div>
         </header>
 
@@ -65,4 +61,3 @@
     </span>
 
 
-    <span @state="headerExpanded"></span>
