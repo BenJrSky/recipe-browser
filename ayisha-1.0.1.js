@@ -1690,16 +1690,18 @@
      * @wait: attende n ms prima di attivare @do/@go
      * Previene loop infiniti e segnala errori di sintassi
      */
-    _handleWhenDoGoWaitDirectives(vNode, ctx) {
+    _handleWhenActionDirectives(vNode, ctx) {
       if (!vNode.directives || !vNode.directives['@when']) return;
       const whenExpr = vNode.directives['@when'];
       const doExpr = vNode.directives['@do'];
       const goExpr = vNode.directives['@go'];
       const waitExpr = vNode.directives['@wait'];
-      // Errore se manca sia @do che @go
-      if (!doExpr && !goExpr) {
+      const fetchExpr = vNode.directives['@fetch'];
+      const resultExpr = vNode.directives['@result'];
+      // Errore se manca almeno una azione
+      if (!doExpr && !goExpr && !fetchExpr) {
         if (vNode._el) {
-          vNode._el.setAttribute('data-ayisha-when-error', '@when richiede almeno @do o @go');
+          vNode._el.setAttribute('data-ayisha-when-error', '@when richiede almeno @do, @go o @fetch');
         }
         return;
       }
@@ -1709,7 +1711,7 @@
       let loopGuard = this._whenDirectiveLoopGuards.get(vNode) || { count: 0, lastPage: null, lastDo: null, lastTime: 0 };
       const evaluateWhen = () => {
         try {
-          return this.evaluator.evalExpr(whenExpr, ctx);
+          return !!this.evaluator.evalExpr(whenExpr, ctx);
         } catch {
           return false;
         }
@@ -1720,6 +1722,7 @@
         let key = '';
         if (goExpr) key += 'go:' + this.evaluator.evalExpr(goExpr, ctx);
         if (doExpr) key += 'do:' + doExpr;
+        if (fetchExpr) key += 'fetch:' + fetchExpr;
         if (key === loopGuard.lastDo && (now - loopGuard.lastTime) < 2000) {
           loopGuard.count++;
         } else {
@@ -1730,7 +1733,7 @@
         this._whenDirectiveLoopGuards.set(vNode, loopGuard);
         if (loopGuard.count > 5) {
           if (vNode._el) {
-            vNode._el.setAttribute('data-ayisha-when-error', 'Loop rilevato nelle direttive @when/@go/@do');
+            vNode._el.setAttribute('data-ayisha-when-error', 'Loop rilevato nelle direttive @when/@go/@do/@fetch');
           }
           return;
         }
@@ -1739,18 +1742,14 @@
         }
         if (goExpr) {
           try {
-            // Permetti sintassi @go="random" come @link
             let page = goExpr;
-            // Se è una variabile, valuta normalmente
             if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(goExpr.trim())) {
-              // Se la variabile esiste nello stato, usa il valore, altrimenti usa il nome come stringa
               if (typeof this.state[goExpr.trim()] !== 'undefined') {
                 page = this.evaluator.evalExpr(goExpr, ctx);
               } else {
                 page = goExpr.trim();
               }
             } else {
-              // Se è un'espressione JS, valuta normalmente
               page = this.evaluator.evalExpr(goExpr, ctx);
             }
             if (typeof page === 'string') {
@@ -1769,14 +1768,17 @@
             }
           } catch (e) { /* error */ }
         }
+        if (fetchExpr) {
+          try {
+            this.fetchManager.setupFetch(fetchExpr, resultExpr || 'result', ctx, null, true);
+          } catch (e) { /* error */ }
+        }
       };
-      // PATCH: Ogni watcher ricorda il proprio valore precedente per nodo
       if (!this._whenDirectiveLastValues) this._whenDirectiveLastValues = new WeakMap();
       let waiting = false;
       const checkAndTrigger = () => {
         const nowValue = evaluateWhen();
         let lastValue = this._whenDirectiveLastValues.get(vNode);
-        // Esegui SOLO se la condizione passa da false a true (transizione)
         if (nowValue && !lastValue && !waiting) {
           if (waitExpr) {
             let ms = parseInt(this.evaluator.evalExpr(waitExpr, ctx), 10);
@@ -1806,7 +1808,6 @@
         if (!this._whenDirectiveWatchers) this._whenDirectiveWatchers = [];
         this._whenDirectiveWatchers.push(checkAndTrigger);
       }
-      // PATCH: NON triggerare subito al primo render, solo dopo cambiamento
       if (!this._whenDirectiveLastValues.has(vNode)) {
         this._whenDirectiveLastValues.set(vNode, evaluateWhen());
       }
@@ -2490,7 +2491,7 @@
         this._goWatchers.forEach(fn => { try { fn(); } catch {} });
       }
       // Gestione direttive @when, @do, @go, @wait
-      this._handleWhenDoGoWaitDirectives(vNode, ctx);
+      this._handleWhenActionDirectives(vNode, ctx);
       if (!vNode) return null;
       // Esegui watcher delle direttive @when
       if (this._whenDirectiveWatchers) {
@@ -3503,7 +3504,8 @@
         });
       }
 
-      if (vNode.directives['@fetch'] && !vNode.subDirectives['@fetch']) {
+      // PATCH: fetch gestito da @when se presente
+      if (vNode.directives['@fetch'] && !vNode.subDirectives['@fetch'] && !vNode.directives['@when']) {
         const expr = this.evaluator.autoVarExpr(vNode.directives['@fetch']);
         const rk = vNode.directives['@result'] || 'result';
         this.fetchManager.setupFetch(expr, rk, ctx);

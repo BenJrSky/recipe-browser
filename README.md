@@ -53,6 +53,45 @@ The execution order of directives on a node follows this hierarchy (from top to 
 
 ---
 
+
+### **New Directives: @when, @do, @go, @wait**
+
+| Directive         | Description | Usage / Example |
+|-------------------|-------------|-------------------------|
+| `@when`           | Watches a condition and triggers `@do` or `@go` when it becomes true (only on transition from false to true). | `<span @when="_currentPage=='home'" @do="step='004'"></span>` |
+| `@do`             | Executes an expression when the associated `@when` condition becomes true. | `<span @when="_currentPage=='random'" @do="step='001'"></span>` |
+| `@go`             | Navigates to a page (SPA style) when the associated `@when` condition becomes true, or on click. The value is the page name (string or variable). | `<span @when="_currentPage=='categories'" @go="random"></span>` |
+| `@wait`           | Delays the execution of `@do` or `@go` by the specified milliseconds after the `@when` condition becomes true. | `<span @when="_currentPage=='search'" @wait="2000" @do="step='003'"></span>` |
+
+#### **Usage Examples**
+
+```html
+<!-- Set step to '004' when entering the home page -->
+<span @when="_currentPage=='home'" @do="step='004'"></span>
+
+<!-- Set step to '001' when entering the random page -->
+<span @when="_currentPage=='random'" @do="step='001'"></span>
+
+<!-- After 2 seconds on the search page, set step to '003' -->
+<span @when="_currentPage=='search'" @wait="2000" @do="step='003'"></span>
+
+<!-- When entering the categories page, automatically go to the random page -->
+<span @when="_currentPage=='categories'" @go="random"></span>
+
+<!-- When entering the random page, after 3 seconds go to the search page -->
+<span @when="_currentPage=='random'" @wait="3000" @go="search"></span>
+```
+
+#### **How it works**
+- `@when` observes a condition and only triggers `@do` or `@go` when the condition changes from false to true (not on initial render if already true).
+- `@do` runs the given expression (e.g. set a variable) when triggered by `@when`.
+- `@go` navigates to the given page (SPA navigation) when triggered by `@when`, or on click if used on a clickable element.
+- `@wait` (optional) adds a delay (in milliseconds) before running `@do` or `@go` after the `@when` condition becomes true.
+
+**These directives are ideal for page transitions, onboarding flows, step-by-step wizards, and reactive navigation logic.**
+
+---
+
 ### **Ayisha.js Directives List**
 
 | Directive         | Description | Usage / Example |
@@ -61,6 +100,10 @@ The execution order of directives on a node follows this hierarchy (from top to 
 | `@show`           | Show the node if the condition is true (like @if, but does not remove from DOM) | `<div @show="condition">Show if true</div>` |
 | `@hide`           | Hide the node if the condition is true | `<div @hide="condition">Hide if true</div>` |
 | `@for`            | Repeat the node for each item in a list | `<li @for="item in items">{{item}}</li>` |
+| `@when`           | Watches a condition and triggers `@do` or `@go` when it becomes true (only on transition from false to true). | `<span @when="_currentPage=='home'" @do="step='004'"></span>` |
+| `@do`             | Executes an expression when the associated `@when` condition becomes true. | `<span @when="_currentPage=='random'" @do="step='001'"></span>` |
+| `@go`             | Navigates to a page (SPA style) when the associated `@when` condition becomes true, or on click. The value is the page name (string or variable). | `<span @when="_currentPage=='categories'" @go="random"></span>` |
+| `@wait`           | Delays the execution of `@do` or `@go` by the specified milliseconds after the `@when` condition becomes true. | `<span @when="_currentPage=='search'" @wait="2000" @do="step='003'"></span>` |
 | `@model`          | Two-way binding between input and state | `<input @model="name">` |
 | `@validate`       | Apply validation rules to input | `<input @validate="required,minLength:3">` |
 | `@click`          | Execute code on click | `<button @click="state.count++">Increment</button>` |
@@ -92,6 +135,33 @@ The execution order of directives on a node follows this hierarchy (from top to 
 | `no`              | Disable interpolation | `<no>{{name}}</no>` |
 | `@then`           | Execute code after all other directives | `<div @then="foo=1;;bar=2"></div>` |
 | `@finally`        | Execute code after everything, including @then | `<div @finally="foo=1;;bar=2"></div>` |
+
+#### **Practical Examples for @when, @do, @go, @wait**
+
+```html
+<!-- 1. Show a welcome message only the first time you enter the home page -->
+<div @when="_currentPage=='home' && !welcomeShown" @do="welcomeShown=true">
+  <div class="alert">Welcome to Recipe Browser!</div>
+</div>
+
+<!-- 2. Automatically redirect to the login page if the user is not authenticated -->
+<span @when="!isLoggedIn" @go="login"></span>
+
+<!-- 3. After a successful search, show a message for 2 seconds -->
+<div @when="searchResults.length > 0" @do="showMsg=true"></div>
+<div @when="showMsg" @wait="2000" @do="showMsg=false">
+  <div class="info">Results loaded!</div>
+</div>
+
+<!-- 4. After 3 seconds on the random recipe page, go back to home -->
+<span @when="_currentPage=='random'" @wait="3000" @go="home"></span>
+
+<!-- 5. When entering the categories page, automatically fetch categories if not loaded -->
+<div @when="_currentPage=='categories' && categories.length==0" 
+     @fetch="'https://www.themealdb.com/api/json/v1/1/categories.php'" 
+     @result="categories">
+</div>
+```
 
 #### **Event Variants**
 Many directives support an event variant, e.g.:
