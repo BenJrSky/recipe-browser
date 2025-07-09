@@ -9,7 +9,6 @@
 </head>
 <body>
     <init>
-        currentPage = 'home';
         quickSearch = '';
         selectedCategory = '';
         selectedMealId = '';
@@ -26,18 +25,23 @@
         randomMeal = null;
         loading = false;
         error = '';
+        step = '';
     </init>
 
-    <span @when="_currentPage=='home'" @do="step='001'"></span>
+
+    <init>
+        _currentPage = 'home'
+    </init>
+
+    <span @when="_currentPage=='home'" @do="step='004'"></span>
     <span @when="_currentPage=='random'" @do="step='001'"></span>
+    <span @when="_currentPage=='search'" @wait="2000" @do="step='003'"></span>
+    <span @when="_currentPage=='categories'" @go="random"></span>
+    <span @when="_currentPage=='random'" @wait="3000" @go="search"></span>
 
-    <span @when="_currentPage=='search'" @wait="2000" @do="step='002'"></span>
-    <span @when="_currentPage=='search'" @wait="3000" @go="random"></span>
+    <span @state="step"></span>
+    <span @state="_currentPage"></span>
 
-
-   
-
-<span @state="step"></span>
 
 
     <!-- HEADER -->

@@ -7,6 +7,18 @@
   if (window.AyishaVDOM) return;
 
   class ExpressionEvaluator {
+    // Estrae le variabili usate in una semplice espressione JS (solo casi base)
+    extractDependencies(expr) {
+      if (typeof expr !== 'string') return [];
+      // Cerca variabili tipo foo, foo.bar, foo_bar, foo123
+      const matches = expr.match(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g);
+      if (!matches) return [];
+      // Escludi parole chiave JS e globali
+      const jsGlobals = [
+        'true','false','null','undefined','if','else','for','while','switch','case','default','try','catch','finally','return','var','let','const','function','new','typeof','instanceof','in','do','break','continue','this','window','document','Math','Date','Array','Object','String','Number','Boolean','RegExp','JSON','console','setTimeout','setInterval','fetch','localStorage','sessionStorage','history','location','navigator'
+      ];
+      return matches.filter((v, i, arr) => arr.indexOf(v) === i && !jsGlobals.includes(v));
+    }
     constructor(state) {
       this.state = state;
     }
@@ -1727,29 +1739,44 @@
         }
         if (goExpr) {
           try {
-            let page = this.evaluator.evalExpr(goExpr, ctx);
+            // Permetti sintassi @go="random" come @link
+            let page = goExpr;
+            // Se è una variabile, valuta normalmente
+            if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(goExpr.trim())) {
+              // Se la variabile esiste nello stato, usa il valore, altrimenti usa il nome come stringa
+              if (typeof this.state[goExpr.trim()] !== 'undefined') {
+                page = this.evaluator.evalExpr(goExpr, ctx);
+              } else {
+                page = goExpr.trim();
+              }
+            } else {
+              // Se è un'espressione JS, valuta normalmente
+              page = this.evaluator.evalExpr(goExpr, ctx);
+            }
             if (typeof page === 'string') {
-              // Aggiorna _currentPage e URL come @link
               this.state._currentPage = page;
-              // Aggiorna anche l'URL (simula routing SPA)
               if (window && window.history && typeof window.history.pushState === 'function') {
                 let url = page;
-                // Se la pagina non termina con .html, aggiungilo (compatibilità con le altre pagine)
                 if (!/\.html$/.test(url) && document.querySelector(`component[@page='${page}']`)) {
                   url = page + '.html';
                 }
                 window.history.pushState({}, '', url);
-                // Triggera manualmente l'evento popstate per forzare il rerender del router
                 window.dispatchEvent(new PopStateEvent('popstate'));
+              }
+              if (typeof window.ayisha?.render === 'function') {
+                setTimeout(() => window.ayisha.render(), 0);
               }
             }
           } catch (e) { /* error */ }
         }
       };
-      let lastValue = evaluateWhen();
+      // PATCH: Ogni watcher ricorda il proprio valore precedente per nodo
+      if (!this._whenDirectiveLastValues) this._whenDirectiveLastValues = new WeakMap();
       let waiting = false;
       const checkAndTrigger = () => {
         const nowValue = evaluateWhen();
+        let lastValue = this._whenDirectiveLastValues.get(vNode);
+        // Esegui SOLO se la condizione passa da false a true (transizione)
         if (nowValue && !lastValue && !waiting) {
           if (waitExpr) {
             let ms = parseInt(this.evaluator.evalExpr(waitExpr, ctx), 10);
@@ -1772,14 +1799,17 @@
           waiting = false;
           this._whenDirectiveTimers.delete(vNode);
         }
-        lastValue = nowValue;
+        this._whenDirectiveLastValues.set(vNode, nowValue);
       };
       if (!vNode._ayishaWhenWatcher) {
         vNode._ayishaWhenWatcher = true;
         if (!this._whenDirectiveWatchers) this._whenDirectiveWatchers = [];
         this._whenDirectiveWatchers.push(checkAndTrigger);
       }
-      checkAndTrigger();
+      // PATCH: NON triggerare subito al primo render, solo dopo cambiamento
+      if (!this._whenDirectiveLastValues.has(vNode)) {
+        this._whenDirectiveLastValues.set(vNode, evaluateWhen());
+      }
     }
     static version = "1.0.1";
     constructor(root = document.body) {
@@ -1803,6 +1833,11 @@
       this.bindingManager = new BindingManager(this.evaluator, () => this.render());
       this.centralLogger = new CentralLogger();
       this.centralLogger.initializeLoggers(this.evaluator, this.fetchManager, this.componentManager);
+
+      // PATCH: Forza _currentPage = 'home' se non valorizzato (prima del primo render)
+      if (!('_currentPage' in this.state) || !this.state._currentPage) {
+        this.state._currentPage = 'home';
+      }
 
       window.ayisha = this;
     }
@@ -2063,6 +2098,11 @@
 
       window.scrollTo(scrollX, scrollY);
       this.bindingManager.updateBindings();
+
+      // PATCH: Forza la chiamata dei watcher delle direttive @when dopo ogni render
+      if (this._whenDirectiveWatchers) {
+        this._whenDirectiveWatchers.forEach(fn => { try { fn(); } catch {} });
+      }
 
       this._isRendering = false;
     }
@@ -2397,6 +2437,58 @@
     }
 
     _renderVNode(vNode, ctx) {
+      // (Gestione @do rimossa: ora solo _handleWhenDoGoWaitDirectives gestisce @do in modo corretto e reattivo)
+      // PATCH: Gestione @go click e trigger automatico su transizione @when
+      if (vNode.directives && vNode.directives['@go']) {
+        const goExpr = vNode.directives['@go'];
+        // Handler click (se vuoi anche navigazione manuale)
+        if (!vNode._goHandlerAdded) {
+          vNode._goHandlerAdded = true;
+          if (!vNode._goId) {
+            vNode._goId = 'go-' + Math.random().toString(36).substr(2, 9);
+          }
+          setTimeout(() => {
+            const el = document.querySelector(`[data-ayisha-go-id="${vNode._goId}"]`);
+            if (el) {
+              el.addEventListener('click', e => {
+                e.preventDefault();
+                try {
+                  this.evaluator.executeDirectiveExpression(goExpr, ctx, e);
+                } catch (err) {
+                  console.error('Errore in @go:', err, goExpr);
+                }
+              });
+            }
+          }, 0);
+        }
+        // PATCH: trigger automatico su transizione @when (come @do)
+        if (vNode.directives['@when']) {
+          if (!this._goWatcherAdded) this._goWatcherAdded = new WeakSet();
+          if (!this._goWatcherAdded.has(vNode)) {
+            this._goWatcherAdded.add(vNode);
+            if (!this._goLastValue) this._goLastValue = new WeakMap();
+            this._goLastValue.set(vNode, false);
+            const checkGo = () => {
+              const nowValue = !!this.evaluator.evalExpr(vNode.directives['@when'], ctx);
+              const lastValue = this._goLastValue.get(vNode);
+              if (nowValue && !lastValue) {
+                try {
+                  this.evaluator.executeDirectiveExpression(goExpr, ctx);
+                } catch (err) {
+                  console.error('Errore trigger automatico @go:', err, goExpr);
+                }
+              }
+              this._goLastValue.set(vNode, nowValue);
+            };
+            if (!this._goWatchers) this._goWatchers = [];
+            this._goWatchers.push(checkGo);
+          }
+        }
+      }
+      // PATCH: trigger watcher @go automatici dopo ogni render
+      if (this._goWatchers) {
+        this._goWatchers.forEach(fn => { try { fn(); } catch {} });
+      }
       // Gestione direttive @when, @do, @go, @wait
       this._handleWhenDoGoWaitDirectives(vNode, ctx);
       if (!vNode) return null;
@@ -2545,6 +2637,11 @@
       }
 
       const el = document.createElement(vNode.tag);
+      // PATCH: Se c'è @go, aggiungi attributo identificativo
+      if (vNode.directives && vNode.directives['@go'] && vNode._goId) {
+        el.setAttribute('data-ayisha-go-id', vNode._goId);
+        el.style.cursor = 'pointer';
+      }
 
       Object.entries(vNode.attrs).forEach(([k, v]) => {
         el.setAttribute(k, this.evaluator.evalAttrValue(v, ctx));
