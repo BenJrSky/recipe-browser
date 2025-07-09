@@ -1771,7 +1771,7 @@
   // ===== MAIN AYISHA CLASS =====
 
   class AyishaVDOM {
-    static version = "1.0.0";
+    static version = "1.0.1";
     constructor(root = document.body) {
       this.root = root;
       this.state = {};
