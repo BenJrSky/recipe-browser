@@ -254,7 +254,7 @@ body {
 
 @media (max-width: 480px) {
     .footer {
-        padding-bottom: 2.5rem;
+        padding: 2rem;
     }
     .footer-bottom {
         margin-bottom: 1.5rem;
