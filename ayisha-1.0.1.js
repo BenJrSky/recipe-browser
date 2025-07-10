@@ -1936,23 +1936,23 @@
 
       // PATCH: Forza _currentPage al primo valore di @page trovato nel DOM (prima del primo render)
       if (!('_currentPage' in this.state) || !this.state._currentPage) {
-        // Cerca il primo elemento con direttiva @page
         let firstPage = null;
-        // Cerca tra i <component> con attributo @page
-        const components = document.querySelectorAll('component[@page]');
-        if (components.length > 0) {
-          firstPage = components[0].getAttribute('@page');
-        } else {
-          // Cerca tra tutti gli elementi con attributo @page
-          const allWithPage = document.querySelectorAll('[\@page]');
-          if (allWithPage.length > 0) {
-            firstPage = allWithPage[0].getAttribute('@page');
+        let allWithPage = [];
+        try {
+          allWithPage = document.querySelectorAll('[\@page]');
+        } catch (e) {
+          try {
+            allWithPage = document.querySelectorAll('[@page]');
+          } catch (e2) {
+            allWithPage = [];
           }
+        }
+        if (allWithPage.length > 0) {
+          firstPage = allWithPage[0].getAttribute('@page');
         }
         this.state._currentPage = firstPage || 'home';
       }
 
-    // SEO: Bot detection e rendering
     if (this.isBot && typeof this.isBot === 'function' && this.isBot()) {
       this.renderForSEO();
     }
