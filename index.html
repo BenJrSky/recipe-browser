@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recipe Browser - Ayisha.js example</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="./ayisha-1.0.1.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/BenJrSky/ayisha.js@main/dist/ayisha-1.0.1-min.js"></script>
 </head>
+
 <body>
-    
+
     <init>
         quickSearch = '';
         selectedCategory = '';
@@ -31,7 +33,7 @@
 
     <!-- HEADER -->
     <component @src="./components/header.html"></component>
-    
+
     <!-- NAV BAR -->
     <component @src="./components/nav.html"></component>
 
@@ -45,10 +47,11 @@
     <component @src="./pages/search.html" @page="search"></component>
     <!-- PAGINA RICETTA CASUALE -->
     <component @src="./pages/random.html" @page="random"></component>
-     <!-- PAGINA DETTAGLIO RICETTA -->
+    <!-- PAGINA DETTAGLIO RICETTA -->
     <component @src="./pages/recipe-detail.html" @page="recipe-detail"></component>
     <!-- PAGINA FOOTER -->
     <component @src="./components/footer.html"></component>
 
 </body>
+
 </html>
