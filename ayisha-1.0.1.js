@@ -1,5 +1,5 @@
 /*!
- * Ayisha.js v1.0.0
+ * Ayisha.js v1.0.1
  * (c) 2025 devBen - Benito Massidda
  * License: MIT
  */

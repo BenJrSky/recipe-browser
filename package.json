@@ -1,0 +1,13 @@
+{
+  "name": "ayisha",
+  "version": "1.0.1",
+  "description": "Ayisha.js - Un framework JavaScript per SPA, simile a Vue/React",
+  "main": "ayisha-1.0.1.js",
+  "keywords": ["ayisha", "ayisha.js", "framework", "spa", "javascript", "vue", "react"],
+  "author": "devBen",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuo-username/ayisha"
+  }
+}
