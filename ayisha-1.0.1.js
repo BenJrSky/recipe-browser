@@ -1716,6 +1716,71 @@
     }
   }
   class AyishaVDOM {
+    // === SEO: Bot detection ===
+    isBot() {
+      const ua = navigator.userAgent.toLowerCase();
+      return /bot|crawler|spider|googlebot|bingbot|facebookexternalhit|twitterbot/i.test(ua);
+    }
+
+    // === SEO: Rendering per bot ===
+    renderForSEO() {
+      console.log('🤖 Rendering SEO attivo');
+      // Processa tutte le direttive sincrono
+      this.processAllDirectivesSync();
+      // Carica tutti i componenti
+      this.loadAllComponentsSync();
+      // Esegui tutte le @fetch
+      this.executeAllFetchSync();
+      // Genera meta tags automatici
+      this.generateMetaTags();
+    }
+
+    // === SEO: Processa direttive sincrone ===
+    processAllDirectivesSync() {
+      const elements = document.querySelectorAll('[\\@if], [\\@for], [\\@model]');
+      elements.forEach(el => {
+        // Qui si dovrebbe processare la direttiva in modo sincrono per SEO
+        // Placeholder: puoi aggiungere la logica reale secondo il framework
+      });
+    }
+
+    // === SEO: Carica tutti i componenti ===
+    loadAllComponentsSync() {
+      const components = document.querySelectorAll('[data-component]');
+      components.forEach(el => {
+        const componentName = el.getAttribute('data-component');
+        if (this.components && this.components[componentName]) {
+          el.innerHTML = this.components[componentName];
+        }
+      });
+    }
+
+    // === SEO: Esegui tutte le fetch ===
+    executeAllFetchSync() {
+      const fetchElements = document.querySelectorAll('[\\@fetch]');
+      fetchElements.forEach(el => {
+        const fetchConfig = el.getAttribute('@fetch');
+        // Esegui fetch sincrono per SEO
+        // Placeholder: puoi aggiungere la logica reale secondo il framework
+      });
+    }
+
+    // === SEO: Genera meta tags ===
+    generateMetaTags() {
+      // Estrai titolo dal contenuto
+      const h1 = document.querySelector('h1');
+      if (h1 && !document.title) {
+        document.title = h1.textContent;
+      }
+      // Genera description automatica
+      const content = document.body.textContent.slice(0, 160);
+      if (!document.querySelector('meta[name="description"]')) {
+        const meta = document.createElement('meta');
+        meta.name = 'description';
+        meta.content = content;
+        document.head.appendChild(meta);
+      }
+    }
     /**
      * Gestione direttive: @when, @do, @go, @wait
      * @when: osserva un'espressione, quando true attiva @do/@go (eventualmente dopo @wait)
@@ -1869,11 +1934,28 @@
       this.centralLogger = new CentralLogger();
       this.centralLogger.initializeLoggers(this.evaluator, this.fetchManager, this.componentManager);
 
-      // PATCH: Forza _currentPage = 'home' se non valorizzato (prima del primo render)
+      // PATCH: Forza _currentPage al primo valore di @page trovato nel DOM (prima del primo render)
       if (!('_currentPage' in this.state) || !this.state._currentPage) {
-        this.state._currentPage = 'home';
+        // Cerca il primo elemento con direttiva @page
+        let firstPage = null;
+        // Cerca tra i <component> con attributo @page
+        const components = document.querySelectorAll('component[@page]');
+        if (components.length > 0) {
+          firstPage = components[0].getAttribute('@page');
+        } else {
+          // Cerca tra tutti gli elementi con attributo @page
+          const allWithPage = document.querySelectorAll('[\@page]');
+          if (allWithPage.length > 0) {
+            firstPage = allWithPage[0].getAttribute('@page');
+          }
+        }
+        this.state._currentPage = firstPage || 'home';
       }
 
+    // SEO: Bot detection e rendering
+    if (this.isBot && typeof this.isBot === 'function' && this.isBot()) {
+      this.renderForSEO();
+    }
       window.ayisha = this;
     }
 
