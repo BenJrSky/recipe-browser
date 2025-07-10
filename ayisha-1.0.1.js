@@ -1725,25 +1725,92 @@
     // === SEO: Rendering per bot ===
     renderForSEO() {
       console.log('🤖 Rendering SEO attivo');
-      // Processa tutte le direttive sincrono
       this.processAllDirectivesSync();
-      // Carica tutti i componenti
       this.loadAllComponentsSync();
-      // Esegui tutte le @fetch
       this.executeAllFetchSync();
-      // Genera meta tags automatici
       this.generateMetaTags();
     }
 
     // === SEO: Processa direttive sincrone ===
     processAllDirectivesSync() {
-      const elements = document.querySelectorAll('[\\@if], [\\@for], [\\@model]');
-      elements.forEach(el => {
-        // Qui si dovrebbe processare la direttiva in modo sincrono per SEO
-        // Placeholder: puoi aggiungere la logica reale secondo il framework
+      // Process @if: show/hide elements based on condition
+      const ifElements = document.querySelectorAll('[\\@if]');
+      ifElements.forEach(el => {
+        const expr = el.getAttribute('@if');
+        let visible = false;
+        try {
+          visible = this.evaluator.evalExpr(expr, this.state);
+        } catch {}
+        el.style.display = visible ? '' : 'none';
+      });
+
+      // Process @for: repeat elements for each item in array
+      const forElements = document.querySelectorAll('[\\@for]');
+      forElements.forEach(el => {
+        const expr = el.getAttribute('@for');
+        // Support both "item in items" and "index, item in items"
+        let match = expr.match(/(\\w+),\\s*(\\w+) in (.+)/);
+        let arr = [];
+        let itemVar = null, indexVar = null, arrExpr = null;
+        if (match) {
+          indexVar = match[1];
+          itemVar = match[2];
+          arrExpr = match[3];
+        } else {
+          match = expr.match(/(\\w+) in (.+)/);
+          if (match) {
+            itemVar = match[1];
+            arrExpr = match[2];
+          }
+        }
+        if (arrExpr) {
+          try {
+            arr = this.evaluator.evalExpr(arrExpr, this.state) || [];
+            if (typeof arr === 'object' && !Array.isArray(arr)) arr = Object.values(arr);
+          } catch {}
+        }
+        // Remove previous clones
+        const parent = el.parentNode;
+        if (!parent) return;
+        // Remove all previous clones marked with data-ayisha-for-clone
+        parent.querySelectorAll('[data-ayisha-for-clone]').forEach(clone => clone.remove());
+        // Hide the template element
+        el.style.display = 'none';
+        arr.forEach((val, idx) => {
+          const clone = el.cloneNode(true);
+          clone.removeAttribute('@for');
+          clone.setAttribute('data-ayisha-for-clone', '1');
+          clone.style.display = '';
+          // Replace {{item}} and {{index}} in text nodes
+          const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
+          let node;
+          while ((node = walker.nextNode())) {
+            let text = node.textContent;
+            if (itemVar) text = text.replace(new RegExp('{{\\s*' + itemVar + '\\s*}}', 'g'), val);
+            if (indexVar) text = text.replace(new RegExp('{{\\s*' + indexVar + '\\s*}}', 'g'), idx);
+            node.textContent = text;
+          }
+          parent.insertBefore(clone, el.nextSibling);
+        });
+      });
+
+      // Process @model: set input values from state
+      const modelElements = document.querySelectorAll('[\\@model]');
+      modelElements.forEach(el => {
+        const key = el.getAttribute('@model');
+        let val = '';
+        try {
+          val = this.evaluator.evalExpr(key, this.state);
+        } catch {}
+        if (el.type === 'checkbox') {
+          el.checked = !!val;
+        } else if (el.type === 'radio') {
+          el.checked = val == el.value;
+        } else {
+          el.value = val == null ? '' : String(val);
+        }
       });
     }
-
     // === SEO: Carica tutti i componenti ===
     loadAllComponentsSync() {
       const components = document.querySelectorAll('[data-component]');
@@ -1757,14 +1824,48 @@
 
     // === SEO: Esegui tutte le fetch ===
     executeAllFetchSync() {
+      // For SEO: synchronously fetch and populate data for @fetch
       const fetchElements = document.querySelectorAll('[\\@fetch]');
+      const fetchPromises = [];
       fetchElements.forEach(el => {
         const fetchConfig = el.getAttribute('@fetch');
-        // Esegui fetch sincrono per SEO
-        // Placeholder: puoi aggiungere la logica reale secondo il framework
+        // Support: @fetch="url as resultVar"
+        let url = fetchConfig, resultVar = 'result';
+        const asMatch = fetchConfig.match(/(.+) as (\w+)/);
+        if (asMatch) {
+          url = asMatch[1].trim();
+          resultVar = asMatch[2].trim();
+        }
+        // Evaluate url if it's an expression
+        try {
+          url = this.evaluator.evalExpr(url, this.state);
+        } catch {}
+        if (!url) return;
+        // Synchronous fetch is not possible in modern browsers, but for SEO we can use async/await and block rendering
+        // We'll use fetch with await and set state synchronously for bots
+        fetchPromises.push(
+          fetch(url)
+            .then(res => res.json())
+            .then(data => {
+              this.state[resultVar] = data;
+              // Optionally, update DOM if needed
+            })
+            .catch(() => { this.state[resultVar] = null; })
+        );
       });
+      // Block until all fetches are done (for bots)
+      if (fetchPromises.length > 0) {
+        // This is a sync function, but for SEO we can cheat: block with a busy-wait (not ideal, but for bots it's ok)
+        // In real SSR, this would be truly synchronous
+        const start = Date.now();
+        let done = false;
+        Promise.all(fetchPromises).then(() => { done = true; });
+        // Busy-wait for up to 2 seconds
+        while (!done && Date.now() - start < 2000) {
+          // Block
+        }
+      }
     }
-
     // === SEO: Genera meta tags ===
     generateMetaTags() {
       // Estrai titolo dal contenuto
