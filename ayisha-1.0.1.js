@@ -533,6 +533,7 @@
     }
 
     setupFetch(expr, rk, ctx, event, force) {
+      // Supporta @method e @payload come direttive
       let url = this.evaluator.evalExpr(expr, ctx, event);
       if (url === undefined) {
         url = expr.replace(/\{([^}]+)\}/g, (_, key) => {
@@ -540,11 +541,9 @@
           return val != null ? val : '';
         });
       }
-
       if (url === undefined || url === null) {
         url = expr;
       }
-
       if (!url) return;
       const fid = `${url}::${rk}`;
       if (!force && this.lastFetchUrl[rk] === url) return;
@@ -557,14 +556,47 @@
         this.evaluator.state[rk] = null;
       }
 
-      fetch(url)
+      // Ricava il metodo, il payload e gli headers dal contesto vNode se disponibile
+      let method = 'GET';
+      let payload = null;
+      let customHeaders = null;
+      if (ctx && ctx._vNode) {
+        if (ctx._vNode.directives && ctx._vNode.directives['@method']) {
+          method = this.evaluator.evalExpr(ctx._vNode.directives['@method'], ctx, event) || 'GET';
+        }
+        if (ctx._vNode.directives && ctx._vNode.directives['@payload']) {
+          payload = this.evaluator.evalExpr(ctx._vNode.directives['@payload'], ctx, event);
+        }
+        if (ctx._vNode.directives && ctx._vNode.directives['@headers']) {
+          customHeaders = this.evaluator.evalExpr(ctx._vNode.directives['@headers'], ctx, event);
+        }
+      }
+
+      const fetchOptions = { method };
+      let headers = {};
+      if (payload != null && method && method.toUpperCase() !== 'GET') {
+        if (typeof payload === 'object') {
+          fetchOptions.body = JSON.stringify(payload);
+          headers['Content-Type'] = 'application/json';
+        } else {
+          fetchOptions.body = payload;
+        }
+      }
+      if (customHeaders && typeof customHeaders === 'object') {
+        headers = { ...headers, ...customHeaders };
+      }
+      if (Object.keys(headers).length > 0) {
+        fetchOptions.headers = headers;
+      }
+
+      fetch(url, fetchOptions)
         .then(res => {
           if (!res.ok) {
             if (!this.fetched[url]) this.fetched[url] = {};
             this.fetched[url].error = `${res.status} ${res.statusText || 'errore di rete'}`;
             throw new Error(`${res.status} ${res.statusText}`);
           }
-          return res.json();
+          return res.json().catch(() => res.text());
         })
         .then(data => {
           const oldVal = this.evaluator.state[rk];
@@ -602,7 +634,9 @@
         '@for': `Esempio: <li @for="item in items">{{item}}</li> o <li @for="i, item in items">{{i}}: {{item}}</li>`,
         '@model': `Esempio: <input @model="nome">`,
         '@click': `Esempio: <button @click="state.count++">Aumenta</button>`,
-        '@fetch': `Esempio: <div @fetch="'url'" @result="data">Carica</div>`,
+        '@fetch': `Esempio: <div @fetch="'url'" @method="'POST'" @payload="{foo:1}" @headers="{ Authorization: 'Bearer ...' }"></div>`,
+        '@payload': `Esempio: <div @fetch="'url'" @method="'POST'" @payload="{foo:1}"></div>`,
+        '@headers': `Esempio: <div @fetch="'url'" @headers="{ Authorization: 'Bearer ...' }"></div>`,
         '@result': `Esempio: <div @fetch="'url'" @result="data">Carica</div>`,
         '@watch': `Esempio: <div @watch="prop=>console.log(prop)"></div>`,
         '@text': `Esempio: <span @text="nome"></span>`,
