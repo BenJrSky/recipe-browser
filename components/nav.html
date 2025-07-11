@@ -1,4 +1,4 @@
-    <nav @show="headerExpanded" class="nav">
+    <nav @show="headerExpanded || isMobile==false" class="nav">
         <div class="nav-container" @click="headerExpanded=false" >
             <a href="#" @link="home" @class="{'nav-link': true, 'active': _currentPage === 'home'}">⌂ Home</a>
             <a href="#" @link="categories" @class="{'nav-link': true, 'active': _currentPage === 'categories'}">⊞ Categories</a>
@@ -7,17 +7,14 @@
         </div>
     </nav>
 
+    <logic @when="isMobile!==(_screenSize<=768)" @do="isMobile=_screenSize<=768"></logic>
 
-    <init>
-        riconta=2
-    </init>
 
-    <button @set="conta=2" @click="conta=5" >Conta</button>
-    <button @click="headerExpanded=!headerExpanded" >click</button>
 
-    <span  @state="_screenSize"></span>
-    <span @state="headerExpanded"></span>
-    <span @state="conta"></span>
-    <span @state="riconta"></span>
+    <div @state="_screenSize"></div>
+    <div @state="isMobile"></div>
+
+
+
 
 

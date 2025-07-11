@@ -1979,27 +1979,30 @@
       const checkAndTrigger = () => {
         const nowValue = evaluateWhen();
         let lastValue = this._whenDirectiveLastValues.get(vNode);
-        if (nowValue && !lastValue && !waiting) {
-          if (waitExpr) {
-            let ms = parseInt(this.evaluator.evalExpr(waitExpr, ctx), 10);
-            if (isNaN(ms)) ms = 0;
-            if (timer) clearTimeout(timer);
-            waiting = true;
-            timer = setTimeout(() => {
+        // Only trigger if value changed
+        if (nowValue !== lastValue && !waiting) {
+          if (nowValue) {
+            if (waitExpr) {
+              let ms = parseInt(this.evaluator.evalExpr(waitExpr, ctx), 10);
+              if (isNaN(ms)) ms = 0;
+              if (timer) clearTimeout(timer);
+              waiting = true;
+              timer = setTimeout(() => {
+                triggerActions();
+                timer = null;
+                waiting = false;
+                this._whenDirectiveTimers.delete(vNode);
+              }, ms);
+              this._whenDirectiveTimers.set(vNode, timer);
+            } else {
               triggerActions();
-              timer = null;
-              waiting = false;
-              this._whenDirectiveTimers.delete(vNode);
-            }, ms);
-            this._whenDirectiveTimers.set(vNode, timer);
-          } else {
-            triggerActions();
+            }
+          } else if (timer) {
+            clearTimeout(timer);
+            timer = null;
+            waiting = false;
+            this._whenDirectiveTimers.delete(vNode);
           }
-        } else if (!nowValue && timer) {
-          clearTimeout(timer);
-          timer = null;
-          waiting = false;
-          this._whenDirectiveTimers.delete(vNode);
         }
         this._whenDirectiveLastValues.set(vNode, nowValue);
       };
