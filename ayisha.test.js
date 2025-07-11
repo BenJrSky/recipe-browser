@@ -1,24 +1,19 @@
 /*!
- * Ayisha.js v1.0.1
+ * Ayisha.js v1.0.0
  * (c) 2025 devBen - Benito Massidda
  * License: MIT
  */
 (function () {
+  // Prevent redeclaration
   if (window.AyishaVDOM) return;
 
+  // ===== CORE MODULES =====
+
+  /**
+   * Module: Expression Evaluator
+   * Handles all expression evaluation and interpolation
+   */
   class ExpressionEvaluator {
-    // Estrae le variabili usate in una semplice espressione JS (solo casi base)
-    extractDependencies(expr) {
-      if (typeof expr !== 'string') return [];
-      // Cerca variabili tipo foo, foo.bar, foo_bar, foo123
-      const matches = expr.match(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g);
-      if (!matches) return [];
-      // Escludi parole chiave JS e globali
-      const jsGlobals = [
-        'true','false','null','undefined','if','else','for','while','switch','case','default','try','catch','finally','return','var','let','const','function','new','typeof','instanceof','in','do','break','continue','this','window','document','Math','Date','Array','Object','String','Number','Boolean','RegExp','JSON','console','setTimeout','setInterval','fetch','localStorage','sessionStorage','history','location','navigator'
-      ];
-      return matches.filter((v, i, arr) => arr.indexOf(v) === i && !jsGlobals.includes(v));
-    }
     constructor(state) {
       this.state = state;
     }
@@ -38,14 +33,19 @@
       }
     }
 
-
+    /**
+     * Execute multiple expressions separated by various delimiters
+     * Supports: semicolon (;), comma (,), or space-separated assignments
+     */
     executeMultipleExpressions(expr, ctx = {}, event) {
       const trimmed = expr.trim();
 
+      // If it's a simple expression, don't handle it here - let individual handlers take care of it
       if (!this.hasMultipleAssignments(trimmed)) {
         return false;
       }
 
+      // Parse multiple expressions
       const expressions = this.parseMultipleExpressions(trimmed);
 
       try {
@@ -66,16 +66,23 @@
       }
     }
 
+    /**
+     * General helper for executing expressions with multiple expressions support
+     * This can be used by ANY directive that needs to execute code
+     */
     executeDirectiveExpression(expr, ctx = {}, event = null, triggerRender = true) {
       let codeToRun = expr;
 
+      // Handle interpolation
       if (this.hasInterpolation(expr)) {
         codeToRun = this.evalAttrValue(expr, ctx);
       }
 
+      // Remove state. prefix
       const processedCode = codeToRun.replace(/\bstate\./g, '');
 
       try {
+        // Try multiple expressions first
         if (this.executeMultipleExpressions(processedCode, ctx, event)) {
           if (triggerRender) {
             setTimeout(() => window.ayisha && window.ayisha.render(), 0);
@@ -83,6 +90,7 @@
           return true;
         }
 
+        // Fallback to single expression
         const cleanCode = processedCode;
         new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${cleanCode}}}`)
           (this.state, ctx || {}, event);
@@ -97,39 +105,54 @@
       }
     }
 
+    /**
+     * Check if expression contains multiple assignments
+     */
     hasMultipleAssignments(expr) {
+      // If expression contains arrow functions, it's likely a single complex expression
       if (expr.includes('=>')) {
         return false;
       }
 
+      // If expression contains function calls with parentheses, be cautious
       if (expr.includes('(') && expr.includes(')')) {
+        // Only consider semicolon separation for complex expressions with functions
         const result = expr.includes(';');
         return result;
       }
 
+      // Quick checks for obvious separators
       if (expr.includes(';')) {
         return true;
       }
 
+      // Check comma separation (but be careful with function calls)
       if (expr.includes(',') && !expr.includes('(')) {
         return true;
       }
 
+      // Check space separation - look for pattern: var=value space var=value
       const spacePattern = /\w+\s*=\s*[^=\s]+\s+\w+\s*=\s*/;
       const spaceResult = spacePattern.test(expr);
       return spaceResult;
     }
 
-
+    /**
+     * Parse multiple expressions from various formats
+     */
     parseMultipleExpressions(expr) {
+      // First try semicolon separation
       if (expr.includes(';')) {
         return expr.split(';').map(e => e.trim()).filter(e => e);
       }
 
+      // Then try comma separation (but be careful with function calls)
       if (expr.includes(',') && !expr.includes('(')) {
         return expr.split(',').map(e => e.trim()).filter(e => e);
       }
 
+      // Finally try space separation using a more robust approach
+      // Look for patterns like: variable=value followed by space and another variable=value
       const expressions = [];
       let currentExpr = '';
       let inString = false;
@@ -155,10 +178,13 @@
           parenCount--;
           currentExpr += char;
         } else if (!inString && char === ' ' && parenCount === 0) {
+          // Check if we're at a space that could separate expressions
+          // Look ahead to see if there's a variable assignment pattern
           const remaining = expr.substring(i + 1).trim();
           if (remaining.match(/^\w+\s*=/) && currentExpr.trim().includes('=')) {
             expressions.push(currentExpr.trim());
             currentExpr = '';
+            // Skip the space
           } else {
             currentExpr += char;
           }
@@ -168,10 +194,12 @@
         i++;
       }
 
+      // Add the last expression
       if (currentExpr.trim()) {
         expressions.push(currentExpr.trim());
       }
 
+      // Return multiple expressions if we found more than one, otherwise single
       return expressions.length > 1 ? expressions : [expr];
     }
 
@@ -290,7 +318,9 @@
     }
   }
 
-
+  /**
+   * Module: DOM Parser
+   */
   class DOMParser {
     constructor(initBlocks) {
       this.initBlocks = initBlocks;
@@ -317,6 +347,7 @@
         return null;
       }
 
+      // Special handling for <no> tag - preserve raw HTML content
       if (tag === 'no') {
         return {
           tag: 'no',
@@ -324,7 +355,7 @@
           directives: {},
           subDirectives: {},
           children: [],
-          rawContent: node.innerHTML 
+          rawContent: node.innerHTML // Store the raw HTML content
         };
       }
 
@@ -356,11 +387,15 @@
     }
   }
 
+  /**
+   * Module: Component Manager
+   */
   class ComponentManager {
     constructor() {
       this.components = {};
       this.cache = {};
-      this.loadingComponents = new Map(); 
+      this.loadingComponents = new Map(); // Changed from Set to Map to store promises
+      this.debugMode = true; // Aggiunto per debugging
     }
 
     component(name, html) {
@@ -368,24 +403,40 @@
     }
 
     async loadExternalComponent(url) {
+      if (this.debugMode) {
+        console.log(`🔄 ComponentManager: Loading component ${url}`);
+      }
 
+      // Return cached component if available
       if (this.cache[url]) {
+        if (this.debugMode) {
+          console.log(`✅ ComponentManager: Found cached component ${url}`);
+        }
         return this.cache[url];
       }
 
+      // If already loading, return the existing promise
       if (this.loadingComponents.has(url)) {
+        if (this.debugMode) {
+          console.log(`⏳ ComponentManager: Component ${url} already loading, waiting...`);
+        }
         return this.loadingComponents.get(url);
       }
 
+      // Create and store the loading promise
       const loadingPromise = this._fetchComponent(url);
       this.loadingComponents.set(url, loadingPromise);
 
       try {
         const html = await loadingPromise;
         this.cache[url] = html;
+        if (this.debugMode) {
+          console.log(`✅ ComponentManager: Successfully loaded component ${url} (${html.length} chars)`);
+        }
         return html;
       } catch (error) {
         console.error(`❌ ComponentManager: Error loading component ${url}:`, error);
+        // Don't cache errors to allow retry
         return null;
       } finally {
         this.loadingComponents.delete(url);
@@ -393,12 +444,20 @@
     }
 
     async _fetchComponent(url) {
+      if (this.debugMode) {
+        console.log(`🌐 ComponentManager: Fetching ${url}`);
+      }
 
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const html = await response.text();
+
+      if (this.debugMode) {
+        console.log(`📄 ComponentManager: Received ${html.length} characters from ${url}`);
+      }
+
       return html;
     }
 
@@ -414,8 +473,14 @@
       return this.loadingComponents.has(url);
     }
 
+    setDebugMode(enabled) {
+      this.debugMode = enabled;
+    }
   }
 
+  /**
+   * Module: Reactivity System
+   */
   class ReactivitySystem {
     constructor(state, renderCallback) {
       this.state = state;
@@ -453,6 +518,7 @@
             });
           }
 
+          // Debounce renders to prevent loops
           if (this._renderTimeout) {
             clearTimeout(this._renderTimeout);
           }
@@ -533,7 +599,6 @@
     }
 
     setupFetch(expr, rk, ctx, event, force) {
-      // Supporta @method e @payload come direttive
       let url = this.evaluator.evalExpr(expr, ctx, event);
       if (url === undefined) {
         url = expr.replace(/\{([^}]+)\}/g, (_, key) => {
@@ -541,9 +606,11 @@
           return val != null ? val : '';
         });
       }
+
       if (url === undefined || url === null) {
         url = expr;
       }
+
       if (!url) return;
       const fid = `${url}::${rk}`;
       if (!force && this.lastFetchUrl[rk] === url) return;
@@ -556,47 +623,14 @@
         this.evaluator.state[rk] = null;
       }
 
-      // Ricava il metodo, il payload e gli headers dal contesto vNode se disponibile
-      let method = 'GET';
-      let payload = null;
-      let customHeaders = null;
-      if (ctx && ctx._vNode) {
-        if (ctx._vNode.directives && ctx._vNode.directives['@method']) {
-          method = this.evaluator.evalExpr(ctx._vNode.directives['@method'], ctx, event) || 'GET';
-        }
-        if (ctx._vNode.directives && ctx._vNode.directives['@payload']) {
-          payload = this.evaluator.evalExpr(ctx._vNode.directives['@payload'], ctx, event);
-        }
-        if (ctx._vNode.directives && ctx._vNode.directives['@headers']) {
-          customHeaders = this.evaluator.evalExpr(ctx._vNode.directives['@headers'], ctx, event);
-        }
-      }
-
-      const fetchOptions = { method };
-      let headers = {};
-      if (payload != null && method && method.toUpperCase() !== 'GET') {
-        if (typeof payload === 'object') {
-          fetchOptions.body = JSON.stringify(payload);
-          headers['Content-Type'] = 'application/json';
-        } else {
-          fetchOptions.body = payload;
-        }
-      }
-      if (customHeaders && typeof customHeaders === 'object') {
-        headers = { ...headers, ...customHeaders };
-      }
-      if (Object.keys(headers).length > 0) {
-        fetchOptions.headers = headers;
-      }
-
-      fetch(url, fetchOptions)
+      fetch(url)
         .then(res => {
           if (!res.ok) {
             if (!this.fetched[url]) this.fetched[url] = {};
             this.fetched[url].error = `${res.status} ${res.statusText || 'errore di rete'}`;
             throw new Error(`${res.status} ${res.statusText}`);
           }
-          return res.json().catch(() => res.text());
+          return res.json();
         })
         .then(data => {
           const oldVal = this.evaluator.state[rk];
@@ -624,19 +658,13 @@
   class DirectiveHelpSystem {
     constructor() {
       this.helpTexts = {
-        '@when': `Esempio: <span @when="condizione" @do="azione"></span> oppure <span @when="condizione" @go="pagina"></span>`,
-        '@do': `Esempio: <span @when="condizione" @do="azione"></span>`,
-        '@go': `Esempio: <span @when="condizione" @go="pagina"></span>`,
-        '@wait': `Esempio: <span @when="condizione" @wait="1000" @go="pagina"></span>`,
         '@if': `Esempio: <div @if="condizione">Mostra se condizione è true</div>`,
         '@show': `Esempio: <div @show="condizione">Mostra se condizione è true</div>`,
         '@hide': `Esempio: <div @hide="condizione">Nasconde se condizione è true</div>`,
         '@for': `Esempio: <li @for="item in items">{{item}}</li> o <li @for="i, item in items">{{i}}: {{item}}</li>`,
         '@model': `Esempio: <input @model="nome">`,
         '@click': `Esempio: <button @click="state.count++">Aumenta</button>`,
-        '@fetch': `Esempio: <div @fetch="'url'" @method="'POST'" @payload="{foo:1}" @headers="{ Authorization: 'Bearer ...' }"></div>`,
-        '@payload': `Esempio: <div @fetch="'url'" @method="'POST'" @payload="{foo:1}"></div>`,
-        '@headers': `Esempio: <div @fetch="'url'" @headers="{ Authorization: 'Bearer ...' }"></div>`,
+        '@fetch': `Esempio: <div @fetch="'url'" @result="data">Carica</div>`,
         '@result': `Esempio: <div @fetch="'url'" @result="data">Carica</div>`,
         '@watch': `Esempio: <div @watch="prop=>console.log(prop)"></div>`,
         '@text': `Esempio: <span @text="nome"></span>`,
@@ -1385,7 +1413,9 @@
     }
   }
 
-
+  /**
+   * Module: Error Handler
+   */
   class ErrorHandler {
     showAyishaError(el, err, expr) {
       if (!el) return;
@@ -1438,6 +1468,9 @@
     }
   }
 
+  /**
+   * Module: Binding Manager
+   */
   class BindingManager {
     constructor(evaluator, renderCallback) {
       this.evaluator = evaluator;
@@ -1446,6 +1479,7 @@
     }
 
     bindModel(el, key, ctx) {
+      // Determine input type for proper initialization
       let inputTypeForInit = null;
       if (el.type === 'number') {
         inputTypeForInit = 'number';
@@ -1453,6 +1487,7 @@
         inputTypeForInit = 'checkbox';
       }
 
+      // Helper: get root object for binding (context-aware)
       function getRootAndPath(key, ctx, globalState) {
         if (key.includes('.')) {
           const path = key.split('.');
@@ -1469,6 +1504,7 @@
         }
       }
 
+      // Ensure all intermediate objects exist for nested keys (context-aware)
       const { root, path } = getRootAndPath(key, ctx, this.evaluator.state);
       let ref = root;
       if (path.length > 0) {
@@ -1487,6 +1523,8 @@
           if (typeof ref[last] !== 'string') ref[last] = '';
         }
       } else if (typeof ref === 'object' && ref !== null) {
+        // No path, just root object
+        // (rare, e.g. @model="post" where post is an object)
       } else {
         if (el.type === 'number') {
           if (typeof this.evaluator.state[key] !== 'number') this.evaluator.state[key] = 0;
@@ -1512,6 +1550,7 @@
             el.value = '#000000';
           }
         } else {
+          // Fix: always set el.value as string, fallback to '' if undefined/null
           const safeVal = val == null ? '' : String(val);
           if (el.value !== safeVal) el.value = safeVal;
         }
@@ -1521,6 +1560,7 @@
       update();
 
       const handleInput = () => {
+        // Determine input type for proper initialization  
         let inputTypeForInit = null;
         if (el.type === 'number') {
           inputTypeForInit = 'number';
@@ -1528,10 +1568,12 @@
           inputTypeForInit = 'checkbox';
         }
 
+        // Use context-aware root and path for writing
         const { root, path } = getRootAndPath(key, ctx, this.evaluator.state);
         let ref = root;
         let value;
 
+        // Handle different input types
         if (el.type === 'checkbox') {
           value = el.checked;
         } else if (el.type === 'number') {
@@ -1550,12 +1592,15 @@
           const last = path[path.length - 1];
           ref[last] = value;
         } else if (typeof ref === 'object' && ref !== null) {
+          // No path, just root object
+          // (rare, e.g. @model="post" where post is an object)
         } else {
           this.evaluator.state[key] = value;
         }
         this.renderCallback();
       };
 
+      // Use appropriate event for different input types
       if (el.type === 'checkbox' || el.type === 'radio') {
         el.addEventListener('change', handleInput);
       } else {
@@ -1564,6 +1609,8 @@
     }
 
     bindValidation(el, rulesStr, modelVar = null) {
+      // Supporta: required, minLength:3, maxLength:5, email, phone, password, regex:pattern
+      // Parse rules correctly - handle regex patterns that contain commas
       const rules = [];
       let currentRule = '';
       let inRegex = false;
@@ -1588,6 +1635,7 @@
         }
       }
 
+      // Add the last rule if any
       if (currentRule.trim()) {
         rules.push(currentRule.trim());
       }
@@ -1606,6 +1654,7 @@
         let valid = true;
 
         for (const rule of rules) {
+          // Prima controlla se è una regex pura (pattern che inizia con ^ e finisce con $)
           if (/^\^.*\$$/.test(rule)) {
             try {
               const re = new RegExp(rule);
@@ -1664,6 +1713,7 @@
             }
           }
           else if (rule === 'phone') {
+            // Supporta formati: +39 123 456 7890, +39 1234567890, +391234567890
             const phoneRegex = /^\+\d{1,3}\s?\d{3,4}\s?\d{3,4}\s?\d{3,4}$/;
             if (!phoneRegex.test(el.value || '')) {
               valid = false;
@@ -1671,6 +1721,7 @@
             }
           }
           else if (rule === 'password') {
+            // Password sicura: almeno 8 caratteri, almeno una maiuscola, una minuscola, un numero e un simbolo
             const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
             if (!passwordRegex.test(el.value || '')) {
               valid = false;
@@ -1678,6 +1729,7 @@
             }
           }
           else if (rule.startsWith('regex:')) {
+            // regex:pattern oppure solo pattern se non c'è regex:
             let pattern = rule.slice(6);
             try {
               const re = new RegExp(pattern);
@@ -1715,314 +1767,21 @@
       this.modelBindings = [];
     }
   }
+
+  // ===== MAIN AYISHA CLASS =====
+
   class AyishaVDOM {
-    // === SEO: Bot detection ===
-    isBot() {
-      const ua = navigator.userAgent.toLowerCase();
-      return /bot|crawler|spider|googlebot|bingbot|facebookexternalhit|twitterbot/i.test(ua);
-    }
-
-    // === SEO: Rendering per bot ===
-    renderForSEO() {
-      console.log('🤖 Rendering SEO attivo');
-      this.processAllDirectivesSync();
-      this.loadAllComponentsSync();
-      this.executeAllFetchSync();
-      this.generateMetaTags();
-    }
-
-    // === SEO: Processa direttive sincrone ===
-    processAllDirectivesSync() {
-      // Process @if: show/hide elements based on condition
-      const ifElements = document.querySelectorAll('[\\@if]');
-      ifElements.forEach(el => {
-        const expr = el.getAttribute('@if');
-        let visible = false;
-        try {
-          visible = this.evaluator.evalExpr(expr, this.state);
-        } catch {}
-        el.style.display = visible ? '' : 'none';
-      });
-
-      // Process @for: repeat elements for each item in array
-      const forElements = document.querySelectorAll('[\\@for]');
-      forElements.forEach(el => {
-        const expr = el.getAttribute('@for');
-        // Support both "item in items" and "index, item in items"
-        let match = expr.match(/(\\w+),\\s*(\\w+) in (.+)/);
-        let arr = [];
-        let itemVar = null, indexVar = null, arrExpr = null;
-        if (match) {
-          indexVar = match[1];
-          itemVar = match[2];
-          arrExpr = match[3];
-        } else {
-          match = expr.match(/(\\w+) in (.+)/);
-          if (match) {
-            itemVar = match[1];
-            arrExpr = match[2];
-          }
-        }
-        if (arrExpr) {
-          try {
-            arr = this.evaluator.evalExpr(arrExpr, this.state) || [];
-            if (typeof arr === 'object' && !Array.isArray(arr)) arr = Object.values(arr);
-          } catch {}
-        }
-        // Remove previous clones
-        const parent = el.parentNode;
-        if (!parent) return;
-        // Remove all previous clones marked with data-ayisha-for-clone
-        parent.querySelectorAll('[data-ayisha-for-clone]').forEach(clone => clone.remove());
-        // Hide the template element
-        el.style.display = 'none';
-        arr.forEach((val, idx) => {
-          const clone = el.cloneNode(true);
-          clone.removeAttribute('@for');
-          clone.setAttribute('data-ayisha-for-clone', '1');
-          clone.style.display = '';
-          // Replace {{item}} and {{index}} in text nodes
-          const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
-          let node;
-          while ((node = walker.nextNode())) {
-            let text = node.textContent;
-            if (itemVar) text = text.replace(new RegExp('{{\\s*' + itemVar + '\\s*}}', 'g'), val);
-            if (indexVar) text = text.replace(new RegExp('{{\\s*' + indexVar + '\\s*}}', 'g'), idx);
-            node.textContent = text;
-          }
-          parent.insertBefore(clone, el.nextSibling);
-        });
-      });
-
-      // Process @model: set input values from state
-      const modelElements = document.querySelectorAll('[\\@model]');
-      modelElements.forEach(el => {
-        const key = el.getAttribute('@model');
-        let val = '';
-        try {
-          val = this.evaluator.evalExpr(key, this.state);
-        } catch {}
-        if (el.type === 'checkbox') {
-          el.checked = !!val;
-        } else if (el.type === 'radio') {
-          el.checked = val == el.value;
-        } else {
-          el.value = val == null ? '' : String(val);
-        }
-      });
-    }
-    // === SEO: Carica tutti i componenti ===
-    loadAllComponentsSync() {
-      const components = document.querySelectorAll('[data-component]');
-      components.forEach(el => {
-        const componentName = el.getAttribute('data-component');
-        if (this.components && this.components[componentName]) {
-          el.innerHTML = this.components[componentName];
-        }
-      });
-    }
-
-    // === SEO: Esegui tutte le fetch ===
-    executeAllFetchSync() {
-      // For SEO: synchronously fetch and populate data for @fetch
-      const fetchElements = document.querySelectorAll('[\\@fetch]');
-      const fetchPromises = [];
-      fetchElements.forEach(el => {
-        const fetchConfig = el.getAttribute('@fetch');
-        // Support: @fetch="url as resultVar"
-        let url = fetchConfig, resultVar = 'result';
-        const asMatch = fetchConfig.match(/(.+) as (\w+)/);
-        if (asMatch) {
-          url = asMatch[1].trim();
-          resultVar = asMatch[2].trim();
-        }
-        // Evaluate url if it's an expression
-        try {
-          url = this.evaluator.evalExpr(url, this.state);
-        } catch {}
-        if (!url) return;
-        // Synchronous fetch is not possible in modern browsers, but for SEO we can use async/await and block rendering
-        // We'll use fetch with await and set state synchronously for bots
-        fetchPromises.push(
-          fetch(url)
-            .then(res => res.json())
-            .then(data => {
-              this.state[resultVar] = data;
-              // Optionally, update DOM if needed
-            })
-            .catch(() => { this.state[resultVar] = null; })
-        );
-      });
-      // Block until all fetches are done (for bots)
-      if (fetchPromises.length > 0) {
-        // This is a sync function, but for SEO we can cheat: block with a busy-wait (not ideal, but for bots it's ok)
-        // In real SSR, this would be truly synchronous
-        const start = Date.now();
-        let done = false;
-        Promise.all(fetchPromises).then(() => { done = true; });
-        // Busy-wait for up to 2 seconds
-        while (!done && Date.now() - start < 2000) {
-          // Block
-        }
-      }
-    }
-    // === SEO: Genera meta tags ===
-    generateMetaTags() {
-      // Estrai titolo dal contenuto
-      const h1 = document.querySelector('h1');
-      if (h1 && !document.title) {
-        document.title = h1.textContent;
-      }
-      // Genera description automatica
-      const content = document.body.textContent.slice(0, 160);
-      if (!document.querySelector('meta[name="description"]')) {
-        const meta = document.createElement('meta');
-        meta.name = 'description';
-        meta.content = content;
-        document.head.appendChild(meta);
-      }
-    }
-    /**
-     * Gestione direttive: @when, @do, @go, @wait
-     * @when: osserva un'espressione, quando true attiva @do/@go (eventualmente dopo @wait)
-     * @do: esegue un'espressione
-     * @go: cambia _currentPage e aggiorna l'URL come @link
-     * @wait: attende n ms prima di attivare @do/@go
-     * Previene loop infiniti e segnala errori di sintassi
-     */
-    _handleWhenActionDirectives(vNode, ctx) {
-      if (!vNode.directives || !vNode.directives['@when']) return;
-      const whenExpr = vNode.directives['@when'];
-      const doExpr = vNode.directives['@do'];
-      const goExpr = vNode.directives['@go'];
-      const waitExpr = vNode.directives['@wait'];
-      const fetchExpr = vNode.directives['@fetch'];
-      const resultExpr = vNode.directives['@result'];
-      // Errore se manca almeno una azione
-      if (!doExpr && !goExpr && !fetchExpr) {
-        if (vNode._el) {
-          vNode._el.setAttribute('data-ayisha-when-error', '@when richiede almeno @do, @go o @fetch');
-        }
-        return;
-      }
-      if (!this._whenDirectiveTimers) this._whenDirectiveTimers = new WeakMap();
-      if (!this._whenDirectiveLoopGuards) this._whenDirectiveLoopGuards = new WeakMap();
-      let timer = this._whenDirectiveTimers.get(vNode) || null;
-      let loopGuard = this._whenDirectiveLoopGuards.get(vNode) || { count: 0, lastPage: null, lastDo: null, lastTime: 0 };
-      const evaluateWhen = () => {
-        try {
-          return !!this.evaluator.evalExpr(whenExpr, ctx);
-        } catch {
-          return false;
-        }
-      };
-      const triggerActions = () => {
-        // Loop guard: se la stessa azione viene triggerata >5 volte in 2s, errore
-        const now = Date.now();
-        let key = '';
-        if (goExpr) key += 'go:' + this.evaluator.evalExpr(goExpr, ctx);
-        if (doExpr) key += 'do:' + doExpr;
-        if (fetchExpr) key += 'fetch:' + fetchExpr;
-        if (key === loopGuard.lastDo && (now - loopGuard.lastTime) < 2000) {
-          loopGuard.count++;
-        } else {
-          loopGuard.count = 1;
-        }
-        loopGuard.lastDo = key;
-        loopGuard.lastTime = now;
-        this._whenDirectiveLoopGuards.set(vNode, loopGuard);
-        if (loopGuard.count > 5) {
-          if (vNode._el) {
-            vNode._el.setAttribute('data-ayisha-when-error', 'Loop rilevato nelle direttive @when/@go/@do/@fetch');
-          }
-          return;
-        }
-        if (doExpr) {
-          try { this.evaluator.executeDirectiveExpression(doExpr, ctx); } catch (e) { /* error */ }
-        }
-        if (goExpr) {
-          try {
-            let page = goExpr;
-            if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(goExpr.trim())) {
-              if (typeof this.state[goExpr.trim()] !== 'undefined') {
-                page = this.evaluator.evalExpr(goExpr, ctx);
-              } else {
-                page = goExpr.trim();
-              }
-            } else {
-              page = this.evaluator.evalExpr(goExpr, ctx);
-            }
-            if (typeof page === 'string') {
-              this.state._currentPage = page;
-              if (window && window.history && typeof window.history.pushState === 'function') {
-                let url = page;
-                if (!/\.html$/.test(url) && document.querySelector(`component[@page='${page}']`)) {
-                  url = page + '.html';
-                }
-                window.history.pushState({}, '', url);
-                window.dispatchEvent(new PopStateEvent('popstate'));
-              }
-              if (typeof window.ayisha?.render === 'function') {
-                setTimeout(() => window.ayisha.render(), 0);
-              }
-            }
-          } catch (e) { /* error */ }
-        }
-        if (fetchExpr) {
-          try {
-            this.fetchManager.setupFetch(fetchExpr, resultExpr || 'result', ctx, null, true);
-          } catch (e) { /* error */ }
-        }
-      };
-      if (!this._whenDirectiveLastValues) this._whenDirectiveLastValues = new WeakMap();
-      let waiting = false;
-      const checkAndTrigger = () => {
-        const nowValue = evaluateWhen();
-        let lastValue = this._whenDirectiveLastValues.get(vNode);
-        if (nowValue && !lastValue && !waiting) {
-          if (waitExpr) {
-            let ms = parseInt(this.evaluator.evalExpr(waitExpr, ctx), 10);
-            if (isNaN(ms)) ms = 0;
-            if (timer) clearTimeout(timer);
-            waiting = true;
-            timer = setTimeout(() => {
-              triggerActions();
-              timer = null;
-              waiting = false;
-              this._whenDirectiveTimers.delete(vNode);
-            }, ms);
-            this._whenDirectiveTimers.set(vNode, timer);
-          } else {
-            triggerActions();
-          }
-        } else if (!nowValue && timer) {
-          clearTimeout(timer);
-          timer = null;
-          waiting = false;
-          this._whenDirectiveTimers.delete(vNode);
-        }
-        this._whenDirectiveLastValues.set(vNode, nowValue);
-      };
-      if (!vNode._ayishaWhenWatcher) {
-        vNode._ayishaWhenWatcher = true;
-        if (!this._whenDirectiveWatchers) this._whenDirectiveWatchers = [];
-        this._whenDirectiveWatchers.push(checkAndTrigger);
-      }
-      if (!this._whenDirectiveLastValues.has(vNode)) {
-        this._whenDirectiveLastValues.set(vNode, evaluateWhen());
-      }
-    }
-    static version = "1.0.1";
+    static version = "1.0.0";
     constructor(root = document.body) {
       this.root = root;
       this.state = {};
       this._initBlocks = [];
       this._vdom = null;
       this._isRendering = false;
-      this._processedSetDirectives = new Set();
-      this._componentRenderTimeout = null;
-      this._setNodes = new WeakSet();
+      this._processedSetDirectives = new Set(); // Track processed @set directives
+      this._componentRenderTimeout = null; // Timeout per debounce del rendering dei componenti
 
+      // Initialize modules in correct order
       this.evaluator = new ExpressionEvaluator(this.state);
       this.parser = new DOMParser(this._initBlocks);
       this.componentManager = new ComponentManager();
@@ -2035,28 +1794,6 @@
       this.centralLogger = new CentralLogger();
       this.centralLogger.initializeLoggers(this.evaluator, this.fetchManager, this.componentManager);
 
-      // PATCH: Forza _currentPage al primo valore di @page trovato nel DOM (prima del primo render)
-      if (!('_currentPage' in this.state) || !this.state._currentPage) {
-        let firstPage = null;
-        let allWithPage = [];
-        try {
-          allWithPage = document.querySelectorAll('[\@page]');
-        } catch (e) {
-          try {
-            allWithPage = document.querySelectorAll('[@page]');
-          } catch (e2) {
-            allWithPage = [];
-          }
-        }
-        if (allWithPage.length > 0) {
-          firstPage = allWithPage[0].getAttribute('@page');
-        }
-        this.state._currentPage = firstPage || 'home';
-      }
-
-    if (this.isBot && typeof this.isBot === 'function' && this.isBot()) {
-      this.renderForSEO();
-    }
       window.ayisha = this;
     }
 
@@ -2077,29 +1814,38 @@
     }
 
     _runInitBlocks() {
+      // Avoid running init blocks during rendering to prevent loops
       if (this._isRendering) {
         return;
       }
 
       this._initBlocks.forEach(code => {
+        // Skip empty or whitespace-only code
         if (!code || !code.trim()) {
           return;
         }
+
+        // Clean and normalize the code while preserving JavaScript syntax
         let cleanCode = code.trim()
-          .replace(/[\u200B-\u200D\uFEFF]/g, '')
-          .replace(/\r\n/g, '\n')
-          .replace(/\r/g, '\n')
-          .replace(/\n\s*\n/g, '\n')
-          .replace(/\n\s+/g, '\n')
+          .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+          .replace(/\r\n/g, '\n') // Normalize line endings
+          .replace(/\r/g, '\n') // Normalize line endings
+          .replace(/\n\s*\n/g, '\n') // Remove empty lines
+          .replace(/\n\s+/g, '\n') // Remove leading whitespace from lines
           .trim();
 
+        // Trasforma "foo = ..." in "state.foo = ..." solo se non già prefissato
         let transformed = cleanCode;
 
+        // Applica la trasformazione solo alle righe che non contengono parole chiave JS
         const lines = transformed.split('\n');
         const transformedLines = lines.map(line => {
           const trimmedLine = line.trim();
 
+          // Skip empty lines, comments, and control structures
           if (!trimmedLine ||
+            trimmedLine.startsWith('//') ||
+            trimmedLine.startsWith('/*') ||
             trimmedLine.startsWith('function') ||
             trimmedLine.includes('function(') ||
             trimmedLine.includes('=>') ||
@@ -2107,6 +1853,8 @@
             return line;
           }
 
+          // Transform assignment statements: "foo = ..." to "state.foo = ..."
+          // But only if not already prefixed with state, this, window, etc.
           const assignmentMatch = trimmedLine.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$/);
           if (assignmentMatch &&
             !trimmedLine.includes('state.') &&
@@ -2116,6 +1864,7 @@
             !trimmedLine.includes('localStorage.') &&
             !trimmedLine.includes('sessionStorage.')) {
             const [, varName, value] = assignmentMatch;
+            // Don't transform JavaScript globals
             const jsGlobals = ['JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp'];
             if (!jsGlobals.includes(varName)) {
               return line.replace(assignmentMatch[0], `state.${varName} = ${value}`);
@@ -2130,7 +1879,7 @@
         try {
           new Function('state', transformed)(this.state);
         } catch (e) {
-          console.error('Init error:', e);
+          console.error('Init error:', e, 'Original code:', code, 'Cleaned:', cleanCode, 'Transformed:', transformed);
         }
       });
 
@@ -2169,24 +1918,6 @@
       if (!this.state._currentPage) this.state._currentPage = '';
       if (!this.state._version) this.state._version = AyishaVDOM.version;
       if (!this.state._locale) this.state._locale = (navigator.language || navigator.userLanguage || 'en');
-
-      const getBreakpoint = (w) => {
-        if (w < 576) return 'xs';
-        if (w < 768) return 'sm';
-        if (w < 992) return 'md';
-        if (w < 1200) return 'lg';
-        if (w < 1400) return 'xl';
-        return 'xxl';
-      };
-      const updateScreenVars = () => {
-        this.state._currentBreakpoint = getBreakpoint(window.innerWidth);
-        this.state._screenSize = window.innerWidth;
-      };
-      updateScreenVars();
-      if (!this._breakpointListenerAdded) {
-        window.addEventListener('resize', updateScreenVars);
-        this._breakpointListenerAdded = true;
-      }
     }
 
     _makeReactive() {
@@ -2217,21 +1948,26 @@
       const componentPromises = [];
       const processedUrls = new Set();
 
+      // Trova tutti i tag component
       const componentElements = this.root.querySelectorAll('component');
 
       componentElements.forEach(el => {
         let srcUrl = null;
 
+        // Controlla sia 'src' che '@src'
         if (el.hasAttribute('src')) {
           srcUrl = el.getAttribute('src');
         } else if (el.hasAttribute('@src')) {
           const attrValue = el.getAttribute('@src');
+          // Se è una stringa quotata, rimuovi le quote
           if (/^['\"].*['\"]$/.test(attrValue)) {
             srcUrl = attrValue.slice(1, -1);
           } else {
+            // Prova a valutare come espressione
             try {
               srcUrl = this.evaluator.evalExpr(attrValue);
             } catch (e) {
+              // Se fallisce, usa il valore raw se sembra un path
               if (attrValue.includes('.html') || attrValue.startsWith('./')) {
                 srcUrl = attrValue;
               }
@@ -2239,6 +1975,7 @@
           }
         }
 
+        // Se abbiamo un URL valido e non è già stato processato
         if (srcUrl && !processedUrls.has(srcUrl) && !this.componentManager.getCachedComponent(srcUrl)) {
           processedUrls.add(srcUrl);
           componentPromises.push(this.componentManager.loadExternalComponent(srcUrl));
@@ -2246,11 +1983,22 @@
       });
 
       if (componentPromises.length > 0) {
+        console.log(`Preloading ${componentPromises.length} components...`);
         try {
-          await Promise.allSettled(componentPromises);
+          const results = await Promise.allSettled(componentPromises);
+          const successful = results.filter(r => r.status === 'fulfilled').length;
+          const failed = results.filter(r => r.status === 'rejected').length;
+
+          console.log(`Components preloaded: ${successful} successful, ${failed} failed`);
+
+          if (failed > 0) {
+            console.warn('Failed components:', results.filter(r => r.status === 'rejected').map(r => r.reason));
+          }
         } catch (error) {
-          console.error('Error during component preloading:', error);
+          console.warn('Error during component preloading:', error);
         }
+      } else {
+        console.log('No components found to preload');
       }
     }
 
@@ -2312,23 +2060,21 @@
         }
       }
 
+      // Aggiungi gli indicatori @log come sibling prima di ripristinare lo scroll
       this._addLogIndicators();
 
       window.scrollTo(scrollX, scrollY);
       this.bindingManager.updateBindings();
 
-      // PATCH: Forza la chiamata dei watcher delle direttive @when dopo ogni render
-      if (this._whenDirectiveWatchers) {
-        this._whenDirectiveWatchers.forEach(fn => { try { fn(); } catch {} });
-      }
-
       this._isRendering = false;
     }
 
     _addLogIndicators() {
+      // Trova tutti gli elementi con data-ayisha-log e aggiungi i log come sibling
       const logElements = this.root.querySelectorAll('[data-ayisha-log="true"]');
 
       logElements.forEach(el => {
+        // Rimuovi eventuali log esistenti
         const existingLog = el.nextElementSibling;
         if (existingLog && existingLog.classList.contains('ayisha-log-display')) {
           existingLog.remove();
@@ -2355,9 +2101,11 @@
             line-height: 1.4 !important;
           `;
 
+          // Genera il contenuto del log usando i dati salvati
           const logContent = this._generateInlineLogContent(el, savedDirectiveInfo);
           logDisplay.innerHTML = logContent;
 
+          // Inserisci come sibling successivo
           if (el.parentNode) {
             el.parentNode.insertBefore(logDisplay, el.nextSibling);
           }
@@ -2388,6 +2136,7 @@
         `;
         errorDisplay.innerHTML = `❌ Log Error: ${errorMessage}`;
 
+        // Inserisci come sibling successivo
         if (el.parentNode) {
           el.parentNode.insertBefore(errorDisplay, el.nextSibling);
         }
@@ -2395,6 +2144,7 @@
     }
 
     _generateInlineLogContent(el, savedDirectiveInfo) {
+      // Usa le informazioni delle direttive salvate al momento della configurazione
       const vNode = {
         tag: savedDirectiveInfo.tag || el.tagName.toLowerCase(),
         directives: savedDirectiveInfo.directives || {},
@@ -2408,8 +2158,9 @@
       let hasTrackedDirectives = false;
       let directiveCount = 0;
 
+      // Processa ogni direttiva con i logger dedicati
       Object.keys(vNode.directives).forEach(directive => {
-        if (directive === '@log') return; 
+        if (directive === '@log') return; // Non mostrare @log stesso
 
         directiveCount++;
 
@@ -2425,6 +2176,7 @@
             </div>`;
           }
         } else {
+          // Direttiva non tracciata - mostra solo valore base
           html += `<div style="color: #999; margin: 2px 0;">
             <span style="color: #ccc;">${directive}</span>: 
             <span style="color: #aaa;">${this._truncateValue(vNode.directives[directive])}</span>
@@ -2433,6 +2185,7 @@
         }
       });
 
+      // Processa le sub-direttive
       Object.entries(vNode.subDirectives || {}).forEach(([directive, events]) => {
         Object.keys(events).forEach(event => {
           directiveCount++;
@@ -2469,6 +2222,7 @@
         </div>`;
       }
 
+      // Informazioni sull'elemento
       if (savedDirectiveInfo.elementInfo) {
         const info = savedDirectiveInfo.elementInfo;
         if (info.className || info.id) {
@@ -2478,6 +2232,7 @@
         }
       }
 
+      // Timestamp
       html += `<div style="color: #666; font-size: 10px; margin-top: 4px; border-top: 1px solid #333; padding-top: 2px;">
         ${new Date().toLocaleTimeString()}
       </div>`;
@@ -2500,6 +2255,7 @@
         return html;
       }
 
+      // Formato specifico per ogni tipo di direttiva
       switch (directiveType.split(':')[0]) {
         case '@for':
           html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
@@ -2655,94 +2411,10 @@
     }
 
     _renderVNode(vNode, ctx) {
-      // (Gestione @do rimossa: ora solo _handleWhenDoGoWaitDirectives gestisce @do in modo corretto e reattivo)
-      // PATCH: Gestione @go click e trigger automatico su transizione @when
-      if (vNode.directives && vNode.directives['@go']) {
-        const goExpr = vNode.directives['@go'];
-        // Handler click (se vuoi anche navigazione manuale)
-        if (!vNode._goHandlerAdded) {
-          vNode._goHandlerAdded = true;
-          if (!vNode._goId) {
-            vNode._goId = 'go-' + Math.random().toString(36).substr(2, 9);
-          }
-          setTimeout(() => {
-            const el = document.querySelector(`[data-ayisha-go-id="${vNode._goId}"]`);
-            if (el) {
-              el.addEventListener('click', e => {
-                e.preventDefault();
-                try {
-                  this.evaluator.executeDirectiveExpression(goExpr, ctx, e);
-                } catch (err) {
-                  console.error('Errore in @go:', err, goExpr);
-                }
-              });
-            }
-          }, 0);
-        }
-        // PATCH: trigger automatico su transizione @when (come @do)
-        if (vNode.directives['@when']) {
-          if (!this._goWatcherAdded) this._goWatcherAdded = new WeakSet();
-          if (!this._goWatcherAdded.has(vNode)) {
-            this._goWatcherAdded.add(vNode);
-            if (!this._goLastValue) this._goLastValue = new WeakMap();
-            this._goLastValue.set(vNode, false);
-            const checkGo = () => {
-              const nowValue = !!this.evaluator.evalExpr(vNode.directives['@when'], ctx);
-              const lastValue = this._goLastValue.get(vNode);
-              if (nowValue && !lastValue) {
-                try {
-                  this.evaluator.executeDirectiveExpression(goExpr, ctx);
-                } catch (err) {
-                  console.error('Errore trigger automatico @go:', err, goExpr);
-                }
-              }
-              this._goLastValue.set(vNode, nowValue);
-            };
-            if (!this._goWatchers) this._goWatchers = [];
-            this._goWatchers.push(checkGo);
-          }
-        }
-      }
-      // PATCH: trigger watcher @go automatici dopo ogni render
-      if (this._goWatchers) {
-        this._goWatchers.forEach(fn => { try { fn(); } catch {} });
-      }
-      // Gestione direttive @when, @do, @go, @wait
-      this._handleWhenActionDirectives(vNode, ctx);
       if (!vNode) return null;
-      // Esegui watcher delle direttive @when
-      if (this._whenDirectiveWatchers) {
-        this._whenDirectiveWatchers.forEach(fn => { try { fn(); } catch {} });
-      }
-      if (vNode.directives && vNode.directives['@set'] && !vNode._setProcessed) {
-        let setExprs = vNode.directives['@set'];
-        if (Array.isArray(setExprs)) {
-          setExprs = setExprs.flat().filter(Boolean);
-        } else if (typeof setExprs === 'string') {
-          setExprs = setExprs.split(/;;|\n/).map(s => s.trim()).filter(Boolean);
-        } else {
-          setExprs = [setExprs];
-        }
-        setExprs.forEach(expr => {
-          try {
-            // Only assign if variable does not exist or is undefined
-            const assignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=([^=].*)/g;
-            let match;
-            while ((match = assignmentRegex.exec(expr)) !== null) {
-              const varName = match[1];
-              if (!(varName in this.state) || this.state[varName] === undefined) {
-                this.state[varName] = this.evaluator.evalExpr(match[2], ctx);
-              }
-            }
-          } catch (e) {
-            console.error('Error in @set directive:', e, 'Expression:', expr);
-            if (!vNode._setErrors) vNode._setErrors = [];
-            vNode._setErrors.push(e.message);
-          }
-        });
-        vNode._setProcessed = true;
-        delete vNode.directives['@set'];
-      }
+
+      // Sposta la logica di filtro @page DOPO il caricamento/caching del componente
+      // In questo modo tutti i componenti vengono fetchati/cachati, ma solo quello attivo viene renderizzato
 
       Object.entries(vNode.directives || {}).forEach(([dir, expr]) => {
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim())) {
@@ -2766,8 +2438,11 @@
       if (vNode && vNode.directives) {
         for (const dir of Object.keys(vNode.directives)) {
           if (dir === '@src' && vNode.tag === 'component') continue;
+          // Allow @attr as a valid directive
           if (dir === '@attr') continue;
+          // Allow @then as a valid directive
           if (dir === '@then') continue;
+          // Allow @finally as a valid directive
           if (dir === '@finally') continue;
           if (!this.helpSystem.isValidDirective(dir)) {
             unknownDirective = dir;
@@ -2849,16 +2524,12 @@
       }
 
       const el = document.createElement(vNode.tag);
-      // PATCH: Se c'è @go, aggiungi attributo identificativo
-      if (vNode.directives && vNode.directives['@go'] && vNode._goId) {
-        el.setAttribute('data-ayisha-go-id', vNode._goId);
-        el.style.cursor = 'pointer';
-      }
 
       Object.entries(vNode.attrs).forEach(([k, v]) => {
         el.setAttribute(k, this.evaluator.evalAttrValue(v, ctx));
       });
 
+      // 1. Handle all directives except @then
       this._handleSpecialDirectives(el, vNode, ctx);
       this._handleStandardDirectives(el, vNode, ctx);
 
@@ -2869,8 +2540,10 @@
 
       this._handleSubDirectives(el, vNode, ctx);
 
+      // 2. Handle @then directives (can be multiple, separated by ;; or as array)
       if (vNode.directives && vNode.directives['@then']) {
         let thenExprs = vNode.directives['@then'];
+        // Support multiple @then separated by ;; or as array
         if (Array.isArray(thenExprs)) {
           thenExprs = thenExprs.flat().filter(Boolean);
         } else if (typeof thenExprs === 'string') {
@@ -2880,6 +2553,7 @@
         }
         thenExprs.forEach(expr => {
           try {
+            // Use the same context as @set
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
               const cleanExpr = String(expr).replace(/\bstate\./g, '');
               new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
@@ -3017,6 +2691,7 @@
           const mapExpr = vNode.directives['@map'];
           let fn;
 
+          // Handle arrow functions
           if (mapExpr.includes('=>')) {
             const [param, body] = mapExpr.split('=>').map(s => s.trim());
             fn = new Function(param.trim(), `return (${body})`);
@@ -3038,6 +2713,7 @@
           const filterExpr = vNode.directives['@filter'];
           let fn;
 
+          // Handle arrow functions
           if (filterExpr.includes('=>')) {
             const [param, body] = filterExpr.split('=>').map(s => s.trim());
             fn = new Function(param.trim(), `return (${body})`);
@@ -3110,10 +2786,17 @@
         return this.errorHandler.createErrorElement(`Error: Invalid component URL`);
       }
 
+      // Risolvi path relativi
       if (srcUrl.startsWith('./')) {
+        // Rimuovi il ./ iniziale
         srcUrl = srcUrl.substring(2);
       }
+
+      console.log(`ComponentManager: Attempting to load component from ${srcUrl}`);
+
+      // Se già in cache, mostra subito
       if (this.componentManager.getCachedComponent(srcUrl)) {
+        console.log(`ComponentManager: Component ${srcUrl} found in cache`);
         const componentHtml = this.componentManager.getCachedComponent(srcUrl);
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = componentHtml;
@@ -3129,13 +2812,18 @@
         }
       }
 
+      // Se il componente non è in cache, avvia il caricamento
       if (!this.componentManager.getCachedComponent(srcUrl)) {
+        console.log(`ComponentManager: Starting load for ${srcUrl}`);
         this.componentManager.loadExternalComponent(srcUrl).then(html => {
           if (html) {
+            console.log(`ComponentManager: Successfully loaded component ${srcUrl} (${html.length} chars)`);
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
             this._processComponentInitBlocks(tempDiv);
+            // Il caricamento è gestito dal ComponentManager
             if (!this._isRendering) {
+              // Usa un debounce per evitare troppi re-render
               clearTimeout(this._componentRenderTimeout);
               this._componentRenderTimeout = setTimeout(() => this.render(), 10);
             }
@@ -3152,6 +2840,7 @@
         });
       }
 
+      // Placeholder di caricamento più elegante
       const placeholder = document.createElement('div');
       placeholder.className = 'component-loading';
       placeholder.style.cssText = 'padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; color: #6c757d; font-size: 14px; text-align: center;';
@@ -3160,43 +2849,52 @@
     }
 
     _processComponentInitBlocks(tempDiv) {
+      // Process all init blocks in the component before parsing
       const initElements = tempDiv.querySelectorAll('init');
       const newInitBlocks = [];
 
       initElements.forEach(initEl => {
         const initContent = initEl.textContent.trim();
         if (initContent) {
+          // Check if this init block was already processed to avoid duplicates
           if (!this._initBlocks.includes(initContent)) {
             newInitBlocks.push(initContent);
             this._initBlocks.push(initContent);
           }
         }
+        // Remove the init element after processing
         initEl.remove();
       });
 
+      // Run only the new init blocks immediately (without triggering render)
       this._runInitBlocksImmediate(newInitBlocks);
     }
 
     _runInitBlocksImmediate(initBlocks) {
       initBlocks.forEach(code => {
+        // Skip empty or whitespace-only code
         if (!code || !code.trim()) {
           return;
         }
 
+        // Clean and normalize the code while preserving JavaScript syntax
         let cleanCode = code.trim()
-          .replace(/[\u200B-\u200D\uFEFF]/g, '') 
-          .replace(/\r\n/g, '\n') 
-          .replace(/\r/g, '\n') 
-          .replace(/\n\s*\n/g, '\n') 
-          .replace(/\n\s+/g, '\n') 
+          .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+          .replace(/\r\n/g, '\n') // Normalize line endings
+          .replace(/\r/g, '\n') // Normalize line endings
+          .replace(/\n\s*\n/g, '\n') // Remove empty lines
+          .replace(/\n\s+/g, '\n') // Remove leading whitespace from lines
           .trim();
 
+        // Trasforma "foo = ..." in "state.foo = ..." solo se non già prefissato
         let transformed = cleanCode;
 
+        // Applica la trasformazione solo alle righe che non contengono parole chiave JS
         const lines = transformed.split('\n');
         const transformedLines = lines.map(line => {
           const trimmedLine = line.trim();
 
+          // Skip empty lines, comments, and control structures
           if (!trimmedLine ||
             trimmedLine.startsWith('//') ||
             trimmedLine.startsWith('/*') ||
@@ -3206,6 +2904,9 @@
             /^(if|else|for|while|switch|case|default|try|catch|finally|return|var|let|const)\b/.test(trimmedLine)) {
             return line;
           }
+
+          // Transform assignment statements: "foo = ..." to "state.foo = ..."
+          // But only if not already prefixed with state, this, window, etc.
           const assignmentMatch = trimmedLine.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$/);
           if (assignmentMatch &&
             !trimmedLine.includes('state.') &&
@@ -3215,6 +2916,7 @@
             !trimmedLine.includes('localStorage.') &&
             !trimmedLine.includes('sessionStorage.')) {
             const [, varName, value] = assignmentMatch;
+            // Don't transform JavaScript globals
             const jsGlobals = ['JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp'];
             if (!jsGlobals.includes(varName)) {
               return line.replace(assignmentMatch[0], `state.${varName} = ${value}`);
@@ -3235,11 +2937,14 @@
     }
 
     _handleNoDirective(vNode, ctx) {
+      // Create a span element to hold the raw content as text
       const span = document.createElement('span');
 
+      // Use the raw content stored during parsing
       if (vNode.rawContent !== undefined) {
         span.textContent = vNode.rawContent;
       } else {
+        // Fallback: reconstruct content without processing
         let rawContent = '';
 
         const collectTextContent = (node) => {
@@ -3248,6 +2953,7 @@
           } else if (node.type === 'text') {
             return node.content || '';
           } else if (node.tag) {
+            // Reconstruct the HTML tag with all attributes and content
             let attrs = '';
             if (node.attrs) {
               attrs = Object.entries(node.attrs)
@@ -3288,39 +2994,37 @@
     }
 
     _handleSpecialDirectives(el, vNode, ctx) {
-      // @set: behaves like <init>, creates/sets variable only once at first render, then disappears from DOM and VDOM
-      if (vNode.directives && vNode.directives['@set'] && !vNode._setProcessed) {
+      // --- @set as one-time init ---
+      if (vNode.directives && vNode.directives['@set']) {
+        // Create a unique identifier for this @set directive
         const setExpr = vNode.directives['@set'];
         const setId = `${vNode.tag}-${JSON.stringify(vNode.attrs)}-${setExpr}`;
-        if (!this._processedSetDirectives) this._processedSetDirectives = new Set();
+
+        // Only execute if not already processed
         if (!this._processedSetDirectives.has(setId)) {
           this._processedSetDirectives.add(setId);
+
           try {
-            // Only assign if variable does not exist or is undefined
-            const assignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=([^=].*)/g;
-            let match;
-            while ((match = assignmentRegex.exec(setExpr)) !== null) {
-              const varName = match[1];
-              if (!(varName in this.state) || this.state[varName] === undefined) {
-                this.state[varName] = this.evaluator.evalExpr(match[2], ctx);
-              }
+            const expr = vNode.directives['@set'];
+
+            // Use the new helper that supports multiple expressions
+            if (!this.evaluator.executeDirectiveExpression(expr, ctx, null, false)) {
+              // Fallback to old method if helper fails
+              const cleanExpr = String(expr).replace(/\bstate\./g, '');
+              new Function('state', 'ctx', `with(state){with(ctx||{}){${cleanExpr}}}`)(this.state, ctx);
             }
           } catch (e) {
-            console.error('Error in @set directive:', e, 'Expression:', setExpr);
+            console.error('Error in @set directive:', e, 'Expression:', vNode.directives['@set']);
             el.setAttribute('data-ayisha-set-error', e.message);
           }
         }
-        // Remove @set from VDOM so it doesn't interfere with other directives
-        vNode._setProcessed = true;
+
+        // Always remove @set from the current vNode to prevent re-execution in this render cycle
         delete vNode.directives['@set'];
-        // Remove element from DOM (if possible)
-        if (el.parentNode) {
-          el.parentNode.removeChild(el);
-        }
-        return; // Do not process further directives for this node
       }
 
 
+      // @state
       if (vNode.directives.hasOwnProperty('@state')) {
         const wrapper = document.createElement('div');
         wrapper.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
@@ -3332,8 +3036,10 @@
 
         let stateValue = this.state;
         let titleText = 'CURRENT STATE';
+        // Check if @state has an expression (e.g. @state="foo")
         const stateExpr = vNode.directives['@state'];
         if (typeof stateExpr === 'string' && stateExpr.trim()) {
+          // Evaluate the expression in the current context
           try {
             stateValue = this.evaluator.evalExpr(stateExpr, ctx);
             titleText = `STATE: ${stateExpr}`;
@@ -3361,6 +3067,7 @@
         el.appendChild(wrapper);
       }
 
+      // @attr
       if (vNode.directives.hasOwnProperty('@attr')) {
         const wrapper = document.createElement('div');
         wrapper.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
@@ -3394,7 +3101,9 @@
         el.appendChild(wrapper);
       }
 
+      // @log come sibling invece che come figlio
       if (vNode.directives.hasOwnProperty('@log')) {
+        // Assicurati che il logger sia inizializzato
         if (!this.centralLogger || !this.centralLogger.loggers || Object.keys(this.centralLogger.loggers).length === 0) {
           console.warn('⚠️ CentralLogger not initialized, initializing now...');
           this.centralLogger.initializeLoggers(this.evaluator, this.fetchManager, this.componentManager);
@@ -3409,6 +3118,7 @@
 
           this.centralLogger.addLog(elementInfo, vNode, ctx, this.state, el);
 
+          // CORREZIONE: Salva le informazioni complete delle direttive originali
           const directiveInfo = {
             tag: vNode.tag,
             directives: { ...vNode.directives },
@@ -3419,6 +3129,7 @@
           el.setAttribute('data-ayisha-log', 'true');
           el.setAttribute('data-ayisha-log-info', JSON.stringify(directiveInfo));
 
+          // Se l'elemento ha @click, configura il logger specifico
           if (vNode.directives['@click']) {
             const clickLogger = this.centralLogger.loggers['@click'];
             if (clickLogger) {
@@ -3452,7 +3163,10 @@
 
           let processedCode = codeToRun.replace(/\bstate\./g, '');
 
+
+
           try {
+            // Handle context object operations (e.g., post.likes++, post.editing = !post.editing)
             const contextObjMatch = processedCode.match(/^(\w+)\.(\w+)(\+\+|--|=.+)$/);
             if (contextObjMatch) {
               const [, objName, propName, operation] = contextObjMatch;
@@ -3460,7 +3174,9 @@
               if (ctx && ctx[objName]) {
                 const targetObj = ctx[objName];
 
+                // Check if the target object has an id (most context objects from @for loops do)
                 if (targetObj && typeof targetObj === 'object' && targetObj.id) {
+                  // Search all state arrays for the object with matching id
                   for (const [stateKey, stateValue] of Object.entries(this.state)) {
                     if (Array.isArray(stateValue)) {
                       const index = stateValue.findIndex(item =>
@@ -3487,6 +3203,8 @@
                   }
                 }
 
+                // If no id or not found in state arrays, try direct modification
+                // This handles cases where the context object is directly from state
                 if (operation === '++') {
                   targetObj[propName] = (targetObj[propName] || 0) + 1;
                   setTimeout(() => this.render(), 0);
@@ -3505,6 +3223,7 @@
               }
             }
 
+            // Handle array filter operations (e.g., posts = posts.filter(p => p.id !== post.id))
             const filterMatch = processedCode.match(/^(\w+)\s*=\s*(\w+)\.filter\((.+)\)$/);
             if (filterMatch) {
               const [, targetVar, sourceVar, filterExpr] = filterMatch;
@@ -3517,6 +3236,7 @@
                   const varName = varMatch[1];
                   objectToDelete = ctx[varName];
                 } else {
+                  // Find any object with an id in the context (fallback)
                   for (const [ctxKey, ctxValue] of Object.entries(ctx)) {
                     if (ctxValue && typeof ctxValue === 'object' && ctxValue.id && ctxKey !== 'users') {
                       objectToDelete = ctxValue;
@@ -3580,6 +3300,7 @@
               return;
             }
 
+            // Check for multiple expressions first (semicolon-separated)
             if (processedCode.includes(';')) {
               try {
                 if (this.evaluator.executeMultipleExpressions(processedCode, ctx, e)) {
@@ -3588,12 +3309,15 @@
                 }
               } catch (multiError) {
                 console.warn('Multiple expressions handler failed:', multiError);
+                // Continue to try individual assignment handling
               }
             }
 
             const assignMatch = processedCode.match(/^(\w+)\s*=\s*(.+)$/);
             if (assignMatch) {
               const [, varName, valueExpr] = assignMatch;
+              // Skip assignment pattern if the value expression contains arrow functions
+              // Let it fall through to the generic handler
               if (valueExpr.includes('=>')) {
                 throw new Error('Assignment with arrow function, using fallback');
               }
@@ -3603,6 +3327,7 @@
               return;
             }
 
+            // Fallback to multiple expressions handler if all individual handlers fail
             try {
               if (this.evaluator.executeMultipleExpressions(processedCode, ctx, e)) {
                 return;
@@ -3611,6 +3336,7 @@
               console.warn('Multiple expressions handler also failed:', multiError);
             }
 
+            // Final fallback to single expression handlers - with render trigger
             const func = new Function('state', 'ctx', `with(state){with(ctx||{}){${processedCode}}}`);
             func(this.state, ctx || {});
             setTimeout(() => this.render(), 0);
@@ -3624,7 +3350,9 @@
         const rawExpr = vNode.directives['@hover'];
         const applyHover = e => {
           try {
+            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(rawExpr, ctx, e, true)) {
+              // Fallback to old method
               let codeToRun = rawExpr;
               if (this.evaluator.hasInterpolation(rawExpr)) {
                 codeToRun = this.evaluator.evalAttrValue(rawExpr, ctx);
@@ -3641,13 +3369,16 @@
         el.addEventListener('mouseout', applyHover);
       }
 
+      // @input directive handler
       if (vNode.directives['@input']) {
         el.addEventListener('input', e => {
           const expr = vNode.directives['@input'];
           this.evaluator.ensureVarInState(expr);
 
           try {
+            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, e, true)) {
+              // Fallback to old method
               let codeToRun = expr;
               if (this.evaluator.hasInterpolation(expr)) {
                 codeToRun = this.evaluator.evalAttrValue(expr, ctx);
@@ -3662,13 +3393,16 @@
         });
       }
 
+      // @focus directive handler
       if (vNode.directives['@focus']) {
         el.addEventListener('focus', e => {
           const expr = vNode.directives['@focus'];
           this.evaluator.ensureVarInState(expr);
 
           try {
+            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, e, true)) {
+              // Fallback to old method
               let codeToRun = expr;
               if (this.evaluator.hasInterpolation(expr)) {
                 codeToRun = this.evaluator.evalAttrValue(expr, ctx);
@@ -3683,13 +3417,16 @@
         });
       }
 
+      // @blur directive handler
       if (vNode.directives['@blur']) {
         el.addEventListener('blur', e => {
           const expr = vNode.directives['@blur'];
           this.evaluator.ensureVarInState(expr);
 
           try {
+            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, e, true)) {
+              // Fallback to old method
               let codeToRun = expr;
               if (this.evaluator.hasInterpolation(expr)) {
                 codeToRun = this.evaluator.evalAttrValue(expr, ctx);
@@ -3704,13 +3441,16 @@
         });
       }
 
+      // @change directive handler
       if (vNode.directives['@change']) {
         el.addEventListener('change', e => {
           const expr = vNode.directives['@change'];
           this.evaluator.ensureVarInState(expr);
 
           try {
+            // Use the new helper that supports multiple expressions
             if (!this.evaluator.executeDirectiveExpression(expr, ctx, e, true)) {
+              // Fallback to old method
               let codeToRun = expr;
               if (this.evaluator.hasInterpolation(expr)) {
                 codeToRun = this.evaluator.evalAttrValue(expr, ctx);
@@ -3725,8 +3465,7 @@
         });
       }
 
-      // PATCH: fetch gestito da @when se presente
-      if (vNode.directives['@fetch'] && !vNode.subDirectives['@fetch'] && !vNode.directives['@when']) {
+      if (vNode.directives['@fetch'] && !vNode.subDirectives['@fetch']) {
         const expr = this.evaluator.autoVarExpr(vNode.directives['@fetch']);
         const rk = vNode.directives['@result'] || 'result';
         this.fetchManager.setupFetch(expr, rk, ctx);
@@ -3744,11 +3483,14 @@
         try {
           const expr = vNode.directives['@text'];
 
+          // Check if this is a multiple assignment expression that should be executed
           const isMultiple = this.evaluator.hasMultipleAssignments(expr);
 
           if (isMultiple) {
+            // For multiple expressions, execute them and don't set text
             this.evaluator.executeDirectiveExpression(expr, ctx, null, false);
           } else {
+            // For single expressions, evaluate to get the text value
             const textValue = this.evaluator.evalExpr(expr, ctx);
             if (textValue === undefined) {
               el.textContent = '';
@@ -3800,6 +3542,8 @@
           this.state._currentPage = vNode.directives['@link'];
         });
       }
+
+      // RIMOSSO: la logica di esclusione per @page è ora gestita in _renderVNode
 
       if (vNode.directives['@animate']) {
         const animationClass = vNode.directives['@animate'];
@@ -3861,7 +3605,9 @@
               try {
                 const cleanCode = String(codeToRun).replace(/\bstate\./g, '');
 
+                // Try multiple expressions handler first
                 if (!this.evaluator.executeMultipleExpressions(cleanCode, ctx, e)) {
+                  // Fallback to single expression
                   new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${cleanCode}}}`)
                     (this.state, ctx, e);
                 }
@@ -4022,7 +3768,9 @@
             const state = window.ayisha.state;
             try {
               window.ayisha.evaluator.ensureVarInState(code);
+              // Use the new helper that supports multiple expressions
               if (!window.ayisha.evaluator.executeDirectiveExpression(code, {}, { newVal }, true)) {
+                // Fallback to old method
                 new Function('state', 'newVal', `with(state) { ${code} }`)(state, newVal);
               }
             } catch (e) {
@@ -4048,7 +3796,9 @@
             const state = window.ayisha.state;
             window.ayisha.evaluator.ensureVarInState(code);
             try {
+              // Use the new helper that supports multiple expressions
               if (!window.ayisha.evaluator.executeDirectiveExpression(code, {}, { newVal }, true)) {
+                // Fallback to old method
                 new Function('state', 'newVal', `with(state){ ${code} }`)(state, newVal);
               }
             } catch (e) {
@@ -4060,12 +3810,14 @@
     }
 
     mount() {
+      // First pass: process all init blocks
       this.root.childNodes.forEach(child => {
         if (child.nodeType === 1 && child.tagName && child.tagName.toLowerCase() === 'init') {
           this.parser.parse(child);
         }
       });
 
+      // Second pass: build the VDOM (excluding init blocks)
       if (this.root.childNodes.length > 1) {
         const fragVNode = { tag: 'fragment', attrs: {}, directives: {}, subDirectives: {}, children: [] };
         this.root.childNodes.forEach(child => {
@@ -4090,12 +3842,15 @@
       this._setupRouting();
       this.router.setupCurrentPageProperty();
 
+      // Precarica i componenti in background - non bloccante
       this.preloadComponents().then(() => {
+        console.log('Component preloading completed, triggering re-render');
         if (!this._isRendering) {
           this.render();
         }
       });
 
+      // Primo render immediato
       this.render();
 
       this.root.addEventListener('click', e => {
@@ -4114,8 +3869,10 @@
     }
   }
 
+  // Set up global reference
   window.AyishaVDOM = AyishaVDOM;
 
+  // Add default animation styles
   const addDefaultAnimationStyles = () => {
     const existingStyle = document.getElementById('ayisha-default-animations');
     if (!existingStyle) {
