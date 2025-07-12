@@ -1781,7 +1781,6 @@
           clone.removeAttribute('@for');
           clone.setAttribute('data-ayisha-for-clone', '1');
           clone.style.display = '';
-          // Replace {{item}} and {{index}} in text nodes
           const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null, false);
           let node;
           while ((node = walker.nextNode())) {
@@ -1794,7 +1793,6 @@
         });
       });
 
-      // Process @model: set input values from state
       const modelElements = document.querySelectorAll('[\\@model]');
       modelElements.forEach(el => {
         const key = el.getAttribute('@model');
@@ -1979,7 +1977,6 @@
       const checkAndTrigger = () => {
         const nowValue = evaluateWhen();
         let lastValue = this._whenDirectiveLastValues.get(vNode);
-        // Only trigger if value changed
         if (nowValue !== lastValue && !waiting) {
           if (nowValue) {
             if (waitExpr) {
@@ -2008,8 +2005,19 @@
       };
       if (!vNode._ayishaWhenWatcher) {
         vNode._ayishaWhenWatcher = true;
-        if (!this._whenDirectiveWatchers) this._whenDirectiveWatchers = [];
-        this._whenDirectiveWatchers.push(checkAndTrigger);
+        let deps = [];
+        try {
+          deps = whenExpr.match(/\b[a-zA-Z_$][a-zA-Z0-9_$]*\b/g) || [];
+          const jsGlobals = [
+            'true','false','null','undefined','if','else','for','while','switch','case','default','try','catch','finally','return','var','let','const','function','window','document','Math','Date','Array','Object','String','Number','Boolean','RegExp','JSON','console','setTimeout','setInterval','localStorage','sessionStorage','history','location','navigator'
+          ];
+          deps = deps.filter(v => !jsGlobals.includes(v));
+        } catch {}
+        deps.forEach(dep => {
+          if (typeof dep === 'string' && dep in this.state) {
+            this.addWatcher(dep, checkAndTrigger);
+          }
+        });
       }
       if (!this._whenDirectiveLastValues.has(vNode)) {
         this._whenDirectiveLastValues.set(vNode, evaluateWhen());
@@ -2038,7 +2046,6 @@
       this.centralLogger = new CentralLogger();
       this.centralLogger.initializeLoggers(this.evaluator, this.fetchManager, this.componentManager);
 
-      // PATCH: Forza _currentPage al primo valore di @page trovato nel DOM (prima del primo render)
       if (!('_currentPage' in this.state) || !this.state._currentPage) {
         let firstPage = null;
         let allWithPage = [];
