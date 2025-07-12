@@ -7,8 +7,13 @@
         </div>
     </nav>
 
-    <logic @when="isMobile!==(_screenSize<=768)" @do="isMobile=_screenSize<=768"></logic>
+    <logic @when="_screenSize<=768" @do="isMobile=true"></logic>
+    <logic @when="_screenSize>768" @do="isMobile=false"></logic>
 
+    <init>
+        isMobile=false
+        headerExpanded=true
+    </init>
 
 
 
