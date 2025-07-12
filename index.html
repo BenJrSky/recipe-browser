@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,8 +8,219 @@
     <link rel="stylesheet" href="styles.css">
     <script src="./ayisha-1.0.1.js"></script>
 </head>
+
 <body>
-    
+
+    <seo>
+
+        <body>
+
+            <header class="header">
+                <button class="header-toggle">
+                    <span class="hamburger">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                </button>
+                <div class="header-content">
+                    <h1>◉ Recipe Browser</h1>
+                    <p>Discover delicious recipes from around the world</p>
+                </div>
+            </header>
+
+
+
+
+
+            <nav class="nav">
+                <div class="nav-container">
+                    <a href="home" class="nav-link active">⌂ Home</a>
+                    <a href="categories" class="nav-link">⊞ Categories</a>
+                    <a href="search" class="nav-link">⊙ Search</a>
+                    <a href="random" class="nav-link">⊛ Random</a>
+                </div>
+            </nav>
+
+            <logic></logic>
+            <logic></logic>
+
+
+
+
+
+
+
+
+
+
+            <div class="container">
+
+                <div class="search-section">
+                    <h2 style="margin-bottom: 1rem; color: var(--text-dark);">Welcome to the world of recipes!</h2>
+                    <p style="color: var(--text-light); margin-bottom: 2rem; font-size: 1.1rem;">
+                        Explore thousands of recipes from around the world. Search by name, browse by category, or be
+                        surprised by a random recipe.
+                    </p>
+
+
+                    <div class="search-container">
+                        <input type="text" class="search-input" placeholder="Search for a recipe...">
+                        <button class="search-btn" href="search">⊙ Search</button>
+                    </div>
+                </div>
+
+
+                <div class="categories-grid">
+                    <div class="category-card" href="categories">
+                        <img src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&amp;h=200&amp;fit=crop"
+                            alt="Categories" class="category-image">
+                        <div class="category-info">
+                            <h3 class="category-name">⊞ Explore Categories</h3>
+                            <p class="category-description">
+                                Browse recipes by category: appetizers, main courses, desserts, and much more.
+                                Easily find what you're looking for.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="category-card" href="search">
+                        <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&amp;h=200&amp;fit=crop"
+                            alt="Search" class="category-image">
+                        <div class="category-info">
+                            <h3 class="category-name">⊙ Advanced Search</h3>
+                            <p class="category-description">
+                                Search recipes by name, main ingredient, or area.
+                                Advanced filters to find exactly what you want.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="category-card" href="random">
+                        <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&amp;h=200&amp;fit=crop"
+                            alt="Random" class="category-image">
+                        <div class="category-info">
+                            <h3 class="category-name">⊛ Random Recipe</h3>
+                            <p class="category-description">
+                                Not sure what to cook? Get inspired by a randomly selected recipe.
+                                Perfect for discovering new flavors!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div style="margin-top: 4rem;">
+                    <h2 style="text-align: center; margin-bottom: 2rem; color: var(--text-dark);">◐ Popular Recipes</h2>
+
+                    <div class="recipes-grid">
+
+
+                        <div class="recipe-card fade-in">
+                            <img src="https://www.themealdb.com/images/media/meals/lx1kkj1593349302.jpg"
+                                alt="recipe.strMeal" class="recipe-image" href="recipe-detail">
+                            <div class="recipe-info">
+                                <h3 class="recipe-name">Rosol (Polish Chicken Soup)</h3>
+                                <span class="recipe-category" href="category-meals">Chicken</span>
+                                <p class="recipe-area">◎ <span>Polish</span></p>
+                            </div>
+                        </div>
+                        <div class="recipe-card fade-in">
+                            <img src="https://www.themealdb.com/images/media/meals/wqurxy1511453156.jpg"
+                                alt="recipe.strMeal" class="recipe-image" href="recipe-detail">
+                            <div class="recipe-info">
+                                <h3 class="recipe-name">Vegetarian Chilli</h3>
+                                <span class="recipe-category" href="category-meals">Vegetarian</span>
+                                <p class="recipe-area">◎ <span>British</span></p>
+                            </div>
+                        </div>
+                        <div class="recipe-card fade-in">
+                            <img src="https://www.themealdb.com/images/media/meals/qwtrtp1511799242.jpg"
+                                alt="recipe.strMeal" class="recipe-image" href="recipe-detail">
+                            <div class="recipe-info">
+                                <h3 class="recipe-name">Provençal Omelette Cake</h3>
+                                <span class="recipe-category" href="category-meals">Vegetarian</span>
+                                <p class="recipe-area">◎ <span>French</span></p>
+                            </div>
+                        </div>
+                        <div class="recipe-card fade-in">
+                            <img src="https://www.themealdb.com/images/media/meals/cuio7s1555492979.jpg"
+                                alt="recipe.strMeal" class="recipe-image" href="recipe-detail">
+                            <div class="recipe-info">
+                                <h3 class="recipe-name">Mbuzi Choma (Roasted Goat)</h3>
+                                <span class="recipe-category" href="category-meals">Goat</span>
+                                <p class="recipe-area">◎ <span>Kenyan</span></p>
+                            </div>
+                        </div>
+                        <div class="recipe-card fade-in">
+                            <img src="https://www.themealdb.com/images/media/meals/b5ft861583188991.jpg"
+                                alt="recipe.strMeal" class="recipe-image" href="recipe-detail">
+                            <div class="recipe-info">
+                                <h3 class="recipe-name">French Onion Chicken with Roasted Carrots &amp; Mashed Potatoes
+                                </h3>
+                                <span class="recipe-category" href="category-meals">Chicken</span>
+                                <p class="recipe-area">◎ <span>American</span></p>
+                            </div>
+                        </div>
+                        <div class="recipe-card fade-in">
+                            <img src="https://www.themealdb.com/images/media/meals/d8f6qx1604182128.jpg"
+                                alt="recipe.strMeal" class="recipe-image" href="recipe-detail">
+                            <div class="recipe-info">
+                                <h3 class="recipe-name">Japanese Katsudon</h3>
+                                <span class="recipe-category" href="category-meals">Pork</span>
+                                <p class="recipe-area">◎ <span>Japanese</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+
+
+
+
+
+
+
+
+
+            <footer class="footer">
+                <div class="footer-content">
+                    <div class="footer-logo">
+                        <img src="/ayisha-logo-black.png" alt="Ayisha Logo" style="height: 40px;">
+                    </div>
+                    <div class="footer-links">
+                        <a href="home">Home</a>
+                        <a href="categories">Categories</a>
+                        <a href="search">Search</a>
+                        <a href="random">Random</a>
+                    </div>
+                    <div class="footer-social">
+                        <a href="https://github.com/BenJrSky/recipe-browser" target="_blank" title="GitHub"
+                            aria-label="GitHub">💻</a>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <span>© 2025 Ayisha Recipes. All rights reserved.</span>
+                    <span style="margin-left:1.5rem;">
+                        Powered by <a href="https://www.ayisha.app" target="_blank" rel="noopener"
+                            style="color:var(--primary-color);text-decoration:none;font-weight:500;">ayisha.js</a>
+                        &nbsp;|&nbsp;
+                        <a href="https://www.devben.app" target="_blank" rel="noopener"
+                            style="color:var(--primary-color);text-decoration:none;font-weight:500;">devBen</a>
+                    </span>
+                </div>
+            </footer>
+
+
+
+
+        </body>
+
+
+    </seo>
+
     <init>
         quickSearch = '';
         selectedCategory = '';
@@ -31,7 +243,7 @@
 
     <!-- HEADER -->
     <component @src="./components/header.html"></component>
-    
+
     <!-- NAV BAR -->
     <component @src="./components/nav.html"></component>
 
@@ -45,10 +257,11 @@
     <component @src="./pages/search.html" @page="search"></component>
     <!-- PAGINA RICETTA CASUALE -->
     <component @src="./pages/random.html" @page="random"></component>
-     <!-- PAGINA DETTAGLIO RICETTA -->
+    <!-- PAGINA DETTAGLIO RICETTA -->
     <component @src="./pages/recipe-detail.html" @page="recipe-detail"></component>
     <!-- PAGINA FOOTER -->
     <component @src="./components/footer.html"></component>
 
 </body>
+
 </html>
