@@ -1,27 +1,27 @@
-  <div class="container">
-                <div class="search-section">
-                    <h2 style="margin-bottom: 1rem; color: var(--text-dark);">Browse by Category</h2>
-                    <p style="color: var(--text-light); margin-bottom: 2rem;">
-                        Choose a category to discover specific recipes. Each category contains authentic and delicious recipes.
-                    </p>
-                </div>
+<div class="container">
+    <div class="search-section">
+        <h2 style="margin-bottom: 1rem; color: var(--text-dark);">Browse by Category</h2>
+        <p style="color: var(--text-light); margin-bottom: 2rem;">
+            Choose a category to discover specific recipes. Each category contains authentic and delicious recipes.
+        </p>
+    </div>
 
-                <!-- Carica categorie -->
-                <div @fetch="https://www.themealdb.com/api/json/v1/1/categories.php" @result="categoriesData"></div>
-                <div @source="categoriesData?.categories || []" @result="categories"></div>
+    <!-- Carica categorie -->
+    <div @fetch="https://www.themealdb.com/api/json/v1/1/categories.php" @result="categoriesData"></div>
+    <div @source="categoriesData?.categories || []" @result="categories"></div>
 
-                <div class="categories-grid">
-                    <div @if="!categoriesData.categories || categoriesData.categories.length === 0" class="loading">
-                        Loading categories...
-                    </div>
-                    
-                    <div @for="category in categoriesData.categories" @key="category.strCategory" class="category-card fade-in"
-                         @click="selectedCategory = category.strCategory" @link="category-meals">
-                        <img src="{{category.strCategoryThumb}}" alt="category.strCategory" class="category-image">
-                        <div class="category-info">
-                            <h3 class="category-name" @text="category.strCategory"></h3>
-                            <p class="category-description" @text="category.strCategoryDescription"></p>
-                        </div>
-                    </div>
-                </div>
+    <div class="categories-grid">
+        <div @if="!categoriesData.categories || categoriesData.categories.length === 0" class="loading">
+            Loading categories...
+        </div>
+
+        <div @for="category in categoriesData.categories" @key="category.strCategory" class="category-card fade-in"
+            @click="selectedCategory = category.strCategory" @link="category-meals">
+            <img src="{{category.strCategoryThumb}}" alt="category.strCategory" class="category-image">
+            <div class="category-info">
+                <h3 class="category-name" @text="category.strCategory"></h3>
+                <p class="category-description" @text="category.strCategoryDescription"></p>
             </div>
+        </div>
+    </div>
+</div>
