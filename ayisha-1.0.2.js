@@ -937,8 +937,10 @@
       }
       if (!url) return Promise.resolve(undefined);
 
-      // FIX: Se l'URL è assoluto (http/https), non modificarlo
-      if (!/^https?:\/\//.test(url)) {
+      // FIX: Se l'URL è assoluto (http/https), non modificarlo e non toccarlo
+      if (/^https?:\/\//i.test(url)) {
+        // URL assoluto, non modificare
+      } else {
         url = url.replace(/\/+$/, ''); // rimuove slash finale
         url = url.replace(/\?$/, ''); // rimuove ? finale
         url = url.replace(/\?&/, '?'); // rimuove & subito dopo ?
