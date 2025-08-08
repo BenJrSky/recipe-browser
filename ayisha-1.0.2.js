@@ -923,6 +923,7 @@
       this.readyPromise = {};
     }
 
+
     setupFetch(expr, rk, ctx, event, force) {
       let url = this.evaluator.evalExpr(expr, ctx, event);
       if (url === undefined) {
@@ -936,13 +937,21 @@
       }
       if (!url) return Promise.resolve(undefined);
 
-      url = url.replace(/\/+$/, ''); // rimuove slash finale
-      url = url.replace(/\?$/, ''); // rimuove ? finale
-      url = url.replace(/\?&/, '?'); // rimuove & subito dopo ?
-      url = url.replace(/\?$/, ''); // rimuove ? finale ancora
-      url = url.replace(/\&+$/, ''); // rimuove & finale
-      url = url.replace(/\?page=(&|$)/, '?').replace(/\?$/, ''); // rimuove page vuoto
-      url = url.replace(/\/\//g, '/'); // rimuove doppio slash
+      // FIX: Se l'URL è assoluto (http/https), non modificarlo
+      if (!/^https?:\/\//.test(url)) {
+        url = url.replace(/\/+$/, ''); // rimuove slash finale
+        url = url.replace(/\?$/, ''); // rimuove ? finale
+        url = url.replace(/\?&/, '?'); // rimuove & subito dopo ?
+        url = url.replace(/\?$/, ''); // rimuove ? finale ancora
+        url = url.replace(/\&+$/, ''); // rimuove & finale
+        url = url.replace(/\?page=(&|$)/, '?').replace(/\?$/, ''); // rimuove page vuoto
+        url = url.replace(/\/\//g, '/'); // rimuove doppio slash
+        // Se l'URL non inizia con "/", aggiungi la base
+        if (!url.startsWith('/')) {
+          url = '/' + url;
+        }
+        url = location.origin + url;
+      }
 
       const fid = `${url}::${rk}`;
 
