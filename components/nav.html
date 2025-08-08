@@ -1,4 +1,14 @@
-    <nav @show="headerExpanded || isMobile==false" class="nav">
+    <nav @show="isMobile==false" class="nav">
+        <div class="nav-container" @click="headerExpanded=false" >
+            <a href="#" @link="home" @class="{'nav-link': true, 'active': _currentPage === 'home'}">⌂ Home</a>
+            <a href="#" @link="categories" @class="{'nav-link': true, 'active': _currentPage === 'categories'}">⊞ Categories</a>
+            <a href="#" @link="search" @class="{'nav-link': true, 'active': _currentPage === 'search'}">⊙ Search</a>
+            <a href="#" @link="random" @class="{'nav-link': true, 'active': _currentPage === 'random'}">⊛ Random</a>
+        </div>
+    </nav>
+
+
+        <nav @show="isMobile==true && headerExpanded==true" class="nav">
         <div class="nav-container" @click="headerExpanded=false" >
             <a href="#" @link="home" @class="{'nav-link': true, 'active': _currentPage === 'home'}">⌂ Home</a>
             <a href="#" @link="categories" @class="{'nav-link': true, 'active': _currentPage === 'categories'}">⊞ Categories</a>
@@ -14,7 +24,6 @@
         isMobile=false
         headerExpanded=true
     </init>
-
 
 
 
