@@ -5947,4 +5947,25 @@
     new AyishaVDOM(document.body).mount();
   }
 
+// --- SSR SUPPORT (Node.js) ---
+if (typeof module !== 'undefined' && module.exports) {
+  // Export a function for SSR
+  module.exports = async function ayishaSSR(htmlString) {
+    // Usa JSDOM per simulare il DOM in Node.js
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM(htmlString);
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.navigator = dom.window.navigator;
+
+    // Esegui AyishaVDOM su document.body
+    const vdom = new window.AyishaVDOM(document.body);
+    await vdom.preloadComponents();
+    await vdom.render();
+
+    // Ritorna l'HTML renderizzato
+    return dom.serialize();
+  };
+}
+
 })();
