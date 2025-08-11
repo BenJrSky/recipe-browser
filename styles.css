@@ -47,7 +47,7 @@
     transition: color 0.2s;
 }
 .footer-social a:hover {
-    color: var(--primary, #e67e22);
+    color: var(--primary, #ff8c69);
 }
 .footer-bottom {
     text-align: center;
@@ -82,7 +82,7 @@
     --coral: #ffa07a;                  /* Corallo pastello */
     --sage: #c3d9c3;                   /* Salvia pastello */
     
-    --primary-color: #ffa07a;          /* Corallo pastello principale */
+    --primary-color: #ff8c69;          /* Corallo pastello principale */
     --primary-light: #ffcccb;          /* Pesca chiaro */
     --primary-dark: #ff8c69;           /* Corallo scuro */
     --secondary-color: #b8e6b8;        /* Menta pastello */

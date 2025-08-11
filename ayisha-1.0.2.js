@@ -5,7 +5,8 @@
  */
 
 (function () {
-  if (window.AyishaVDOM) return;
+  // Allow loading in Node.js for SSR
+  if (typeof window !== 'undefined' && window.AyishaVDOM) return;
 
   class AyishaErrorBus {
     constructor() {
@@ -937,10 +938,8 @@
       }
       if (!url) return Promise.resolve(undefined);
 
-      // FIX: Se l'URL è assoluto (http/https), non modificarlo e non toccarlo
-      if (/^https?:\/\//i.test(url)) {
-        // URL assoluto, non modificare
-      } else {
+      // FIX: Se l'URL è assoluto (http/https), non modificarlo
+      if (!/^https?:\/\//.test(url)) {
         url = url.replace(/\/+$/, ''); // rimuove slash finale
         url = url.replace(/\?$/, ''); // rimuove ? finale
         url = url.replace(/\?&/, '?'); // rimuove & subito dopo ?
@@ -1131,6 +1130,7 @@
         '@hide': `Esempio: <div @hide=\"condizione\">Nasconde se condizione è true</div>`,
         '@for': `Esempio: <li @for="item in items">{{item}}</li> o <li @for="i, item in items">{{i}}: {{item}}</li>`,
         '@model': `Esempio: <input @model="nome">`,
+        '@form': `Esempio: <form @form=\"nomeForm\">...<input @model=\"campo\">...</form> Aggrega tutti i campi @model in state[nomeForm] e calcola la validità globale in _validate[nomeForm] (true/false/null)`,
         '@file': `Esempio: <input type="file" @file="pic"> (salva il file caricato come base64 nella variabile pic)`,
         '@files': `Esempio: <input type="file" multiple @files="gallery"> (salva tutti i file caricati come base64 in un array nella variabile gallery, aggiungendo se già presenti)`,
         '@click': `Esempio: <button @click="state.count++">Aumenta</button>`,
@@ -1625,6 +1625,64 @@
   }
 
   // All Directive Classes
+
+  // @form Directive: aggregates @model fields and computes validation status
+  class FormDirective extends Directive {
+    apply(vNode, ctx, state, el, completionListener = null) {
+      const formName = vNode.directives['@form'];
+      if (!formName) return;
+
+      // Recursively collect all @model fields in this form subtree
+      const modelFields = [];
+      const validationFields = [];
+      function collectModels(node) {
+        if (node.directives && node.directives['@model']) {
+          modelFields.push(node.directives['@model']);
+          if (node.directives['@validate']) {
+            validationFields.push(node.directives['@model']);
+          }
+        }
+        if (node.children && Array.isArray(node.children)) {
+          node.children.forEach(collectModels);
+        }
+      }
+      collectModels(vNode);
+
+      // Build state[formName] object with all model values
+      if (!state[formName]) state[formName] = {};
+      modelFields.forEach(modelVar => {
+        try {
+          state[formName][modelVar] = this.evaluator.evalExpr(modelVar, ctx);
+        } catch (e) {
+          state[formName][modelVar] = undefined;
+        }
+      });
+
+      // Compute overall validation status for the form
+      if (!state._validate) state._validate = {};
+      if (!state._validate[formName]) state._validate[formName] = null;
+      if (validationFields.length === 0) {
+        state._validate[formName] = null;
+      } else {
+        // All fields must be valid (true), if any is false, form is invalid
+        let allValid = true;
+        for (const modelVar of validationFields) {
+          if (state._validate[modelVar] === false) {
+            allValid = false;
+            break;
+          }
+          if (state._validate[modelVar] == null) {
+            allValid = null;
+          }
+        }
+        state._validate[formName] = allValid;
+      }
+
+      if (completionListener) {
+        completionListener.addTask(() => Promise.resolve());
+      }
+    }
+  }
   // @date Directive: formats ISO date strings to human readable
   class DateDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
@@ -3561,6 +3619,7 @@
     '@if': IfDirective,
     '@not': NotDirective,
     '@for': ForDirective,
+    '@form': FormDirective,
     '@model': ModelDirective,
     '@file': FileDirective,
     '@files': FilesDirective,
@@ -3623,6 +3682,7 @@
       this.register('@if', new IfDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@not', new NotDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@for', new ForDirective(this.evaluator, this.bindingManager, this.errorHandler));
+      this.register('@form', new FormDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@model', new ModelDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@file', new FileDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@files', new FilesDirective(this.evaluator, this.bindingManager, this.errorHandler));
@@ -4554,22 +4614,412 @@
       }
     }
 
-    static version = "1.0.2";
+    // NEW: SSR Methods
+    renderToString(template, initialState = {}) {
+      if (!this.isServerSide() && !this.options.ssr) {
+        throw new Error('renderToString can only be called in SSR mode');
+      }
 
-    constructor(root = document.body) {
+      // Set SSR mode
+      this._isSSRMode = true;
+      this.state = { ...this.state, ...initialState };
+
+      // Initialize state
+      this._preInitializeEssentialVariables();
+      this._runInitBlocks();
+
+      // Parse template directly for SSR
+      this._vdom = this._parseTemplateForSSR(template);
+
+      // Render to string
+      const rendered = this._renderVNodeToString(this._vdom, this.state);
+
+      // Prepare hydration data
+      this._hydrationData = {
+        state: this._serializeState(this.state),
+        version: AyishaVDOM.version
+      };
+
+      return {
+        html: rendered,
+        state: this._hydrationData.state,
+        hydrationScript: this._generateHydrationScript()
+      };
+    }
+
+    _parseTemplateForSSR(template) {
+      // Basic HTML parser for SSR
+      const stack = [];
+      const root = { tag: 'fragment', children: [], directives: {} };
+      let current = root;
+      
+      // Simple regex-based HTML parsing
+      const htmlRegex = /<(\/?[a-zA-Z][a-zA-Z0-9]*)((?:\s+[^>]*)?)>/g;
+      let lastIndex = 0;
+      let match;
+      
+      while ((match = htmlRegex.exec(template)) !== null) {
+        // Add text content before this tag
+        const textBefore = template.slice(lastIndex, match.index).trim();
+        if (textBefore) {
+          current.children.push({
+            type: 'text',
+            text: textBefore
+          });
+        }
+        
+        const tagName = match[1];
+        const attributes = match[2];
+        
+        if (tagName.startsWith('/')) {
+          // Closing tag
+          if (stack.length > 0) {
+            current = stack.pop();
+          }
+        } else {
+          // Opening tag
+          const element = {
+            tag: tagName.toLowerCase(),
+            children: [],
+            directives: {},
+            attrs: {}
+          };
+          
+          // Parse attributes
+          if (attributes) {
+            // Handle double-quoted attributes
+            const quotedAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*"([^"]*)"/g;
+            let quotedMatch;
+            while ((quotedMatch = quotedAttrRegex.exec(attributes)) !== null) {
+              const attrName = quotedMatch[1];
+              const attrValue = quotedMatch[2];
+              
+              if (attrName.startsWith('@')) {
+                element.directives[attrName] = attrValue;
+              } else {
+                element.attrs[attrName] = attrValue;
+              }
+            }
+            
+            // Handle single-quoted attributes
+            const singleQuotedAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*'([^']*)'/g;
+            let singleMatch;
+            while ((singleMatch = singleQuotedAttrRegex.exec(attributes)) !== null) {
+              const attrName = singleMatch[1];
+              const attrValue = singleMatch[2];
+              
+              if (attrName.startsWith('@')) {
+                element.directives[attrName] = attrValue;
+              } else {
+                element.attrs[attrName] = attrValue;
+              }
+            }
+            
+            // Also handle attributes without quotes for simple values
+            const simpleAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*([^"'\s>]+)/g;
+            let simpleMatch;
+            while ((simpleMatch = simpleAttrRegex.exec(attributes)) !== null) {
+              const attrName = simpleMatch[1];
+              const attrValue = simpleMatch[2];
+              
+              if (attrName.startsWith('@')) {
+                element.directives[attrName] = attrValue;
+              } else {
+                element.attrs[attrName] = attrValue;
+              }
+            }
+          }
+          
+          current.children.push(element);
+          
+          // Check if it's a self-closing tag
+          const selfClosingTags = ['img', 'br', 'hr', 'input', 'meta', 'link'];
+          if (!selfClosingTags.includes(tagName.toLowerCase()) && !attributes.includes('/')) {
+            stack.push(current);
+            current = element;
+          }
+        }
+        
+        lastIndex = htmlRegex.lastIndex;
+      }
+      
+      // Add remaining text
+      const remainingText = template.slice(lastIndex).trim();
+      if (remainingText) {
+        current.children.push({
+          type: 'text',
+          text: remainingText
+        });
+      }
+      
+      return root;
+    }
+
+    _createVirtualElement(tagName) {
+      // Enhanced DOM-like object for SSR
+      const element = {
+        tagName: tagName.toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        setAttribute: function(name, value) {
+          this.attributes = this.attributes || {};
+          this.attributes[name] = value;
+        },
+        getAttribute: function(name) {
+          return this.attributes?.[name] || null;
+        },
+        hasAttribute: function(name) {
+          return this.attributes && name in this.attributes;
+        },
+        childNodes: [],
+        children: [],
+        nodeType: 1,
+        attributes: {},
+        appendChild: function(child) {
+          this.childNodes.push(child);
+          if (child.nodeType === 1) {
+            this.children.push(child);
+          }
+        },
+        querySelector: function(selector) {
+          // Basic implementation for SSR
+          return null;
+        },
+        querySelectorAll: function(selector) {
+          return [];
+        }
+      };
+      
+      // When innerHTML is set, parse it into child nodes
+      Object.defineProperty(element, 'innerHTML', {
+        get: function() {
+          return this._innerHTML || '';
+        },
+        set: function(html) {
+          this._innerHTML = html;
+          this.childNodes = [];
+          this.children = [];
+          
+          if (html) {
+            // Simple HTML parsing for SSR
+            this._parseHTML(html);
+          }
+        }
+      });
+      
+      element._parseHTML = function(html) {
+        // Basic HTML parsing - create text nodes for now
+        if (html.trim()) {
+          const textNode = {
+            nodeType: 3,
+            textContent: html,
+            nodeValue: html
+          };
+          this.childNodes.push(textNode);
+        }
+      };
+      
+      return element;
+    }
+
+    _renderVNodeToString(vNode, ctx) {
+      if (!vNode) return '';
+
+      if (vNode.type === 'text') {
+        return this._escapeHtml(this.evaluator.evalText(vNode.text, ctx));
+      }
+
+      if (vNode.tag === 'fragment') {
+        return vNode.children.map(child => this._renderVNodeToString(child, ctx)).join('');
+      }
+
+      // Handle conditional rendering
+      if (vNode.directives && vNode.directives['@if'] && !this.evaluator.evalExpr(vNode.directives['@if'], ctx)) return '';
+      if (vNode.directives && vNode.directives['@show'] && !this.evaluator.evalExpr(vNode.directives['@show'], ctx)) return '';
+      if (vNode.directives && vNode.directives['@hide'] && this.evaluator.evalExpr(vNode.directives['@hide'], ctx)) return '';
+
+      // Handle @for directive in SSR
+      if (vNode.directives && vNode.directives['@for']) {
+        return this._handleForDirectiveSSR(vNode, ctx);
+      }
+
+      // Handle @switch directive in SSR
+      if (vNode.directives && vNode.directives['@switch']) {
+        return this._handleSwitchDirectiveSSR(vNode, ctx);
+      }
+
+      // Handle component directive in SSR
+      if (vNode.tag === 'component') {
+        return this._handleComponentDirectiveSSR(vNode, ctx);
+      }
+
+      // Regular element rendering
+      let html = `<${vNode.tag}`;
+
+      // Add attributes
+      Object.entries(vNode.attrs || {}).forEach(([k, v]) => {
+        const value = this.evaluator.evalAttrValue ? this.evaluator.evalAttrValue(v, ctx) : v;
+        html += ` ${k}="${this._escapeHtml(value)}"`;
+      });
+
+      // Add data attributes for hydration
+      if (vNode.directives && Object.keys(vNode.directives).length > 0) {
+        html += ` data-ayisha-hydrate="true"`;
+        html += ` data-ayisha-directives="${this._escapeHtml(JSON.stringify(vNode.directives))}"`;
+      }
+
+      html += '>';
+
+      // Handle @text directive
+      if (vNode.directives && vNode.directives['@text']) {
+        const textValue = this.evaluator.evalExpr(vNode.directives['@text'], ctx);
+        html += this._escapeHtml(String(textValue || ''));
+      } else {
+        // Render children
+        if (vNode.children) {
+          vNode.children.forEach(child => {
+            html += this._renderVNodeToString(child, ctx);
+          });
+        }
+      }
+
+      html += `</${vNode.tag}>`;
+      return html;
+    }
+
+    _handleForDirectiveSSR(vNode, ctx) {
+      let match = vNode.directives['@for'].match(/(\w+),\s*(\w+) in (.+)/);
+      if (match) {
+        const [, indexVar, itemVar, expr] = match;
+        let arr = this.evaluator.evalExpr(expr, ctx) || [];
+        if (typeof arr === 'object' && !Array.isArray(arr)) arr = Object.values(arr);
+        
+        return arr.map((val, index) => {
+          const clone = JSON.parse(JSON.stringify(vNode));
+          delete clone.directives['@for'];
+          const subCtx = { ...ctx, [itemVar]: val, [indexVar]: index };
+          return this._renderVNodeToString(clone, subCtx);
+        }).join('');
+      }
+
+      match = vNode.directives['@for'].match(/(\w+) in (.+)/);
+      if (match) {
+        const [, itemVar, expr] = match;
+        let arr = this.evaluator.evalExpr(expr, ctx) || [];
+        if (typeof arr === 'object' && !Array.isArray(arr)) arr = Object.values(arr);
+        
+        return arr.map((val, index) => {
+          const clone = JSON.parse(JSON.stringify(vNode));
+          delete clone.directives['@for'];
+          const subCtx = { ...ctx, [itemVar]: val, $index: index };
+          return this._renderVNodeToString(clone, subCtx);
+        }).join('');
+      }
+
+      return '';
+    }
+
+    _handleSwitchDirectiveSSR(vNode, ctx) {
+      const swVal = this.evaluator.evalExpr(vNode.directives['@switch'], ctx);
+      for (const child of vNode.children || []) {
+        if (!child.directives) continue;
+        if (child.directives['@case'] != null) {
+          let cv = child.directives['@case'];
+          if (/^['"].*['"]$/.test(cv)) cv = cv.slice(1, -1);
+          if (String(cv) === String(swVal)) {
+            return this._renderVNodeToString(child, ctx);
+          }
+        }
+        if (child.directives['@default'] != null) {
+          return this._renderVNodeToString(child, ctx);
+        }
+      }
+      return '';
+    }
+
+    _handleComponentDirectiveSSR(vNode, ctx) {
+      // For SSR, we'll need to have components pre-loaded or return a placeholder
+      const src = vNode.directives['@src'];
+      if (src && this.componentManager?.getCachedComponent(src)) {
+        const componentHtml = this.componentManager.getCachedComponent(src);
+        return componentHtml; // In real SSR, this would be parsed and rendered
+      }
+      return `<!-- Component: ${src || 'unknown'} -->`;
+    }
+
+    _escapeHtml(text) {
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      };
+      return String(text).replace(/[&<>"']/g, m => map[m]);
+    }
+
+    _serializeState(state) {
+      // Remove non-serializable properties
+      const serializable = {};
+      Object.keys(state).forEach(key => {
+        if (typeof state[key] !== 'function' && key !== '_ayishaInstance') {
+          try {
+            JSON.stringify(state[key]);
+            serializable[key] = state[key];
+          } catch (e) {
+            // Skip non-serializable values
+          }
+        }
+      });
+      return serializable;
+    }
+
+    _generateHydrationScript() {
+      return `
+<script>
+window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
+</script>`;
+    }
+
+    static version = "1.1.0";
+
+    // SSR Detection and Configuration
+    isServerSide() {
+      return typeof window === 'undefined' || typeof document === 'undefined' || typeof global !== 'undefined';
+    }
+
+    isNodeJS() {
+      return typeof process !== 'undefined' && process.versions && process.versions.node;
+    }
+
+    constructor(root = document.body, options = {}) {
+      // SSR Configuration
+      this.options = {
+        ssr: false,
+        hydration: false,
+        initialState: {},
+        ...options
+      };
+
       this.errorBus = new AyishaErrorBus();
       this.errorBus.onError(() => {
         setTimeout(() => this.showAllErrors(), 0);
       });
 
       this.root = root;
-      this.state = {};
+      this.state = { ...this.options.initialState };
       this._initBlocks = [];
       this._vdom = null;
       this._isRendering = false;
       this._processedSetDirectives = new Set();
       this._componentRenderTimeout = null;
       this._setNodes = new WeakSet();
+
+      // SSR specific properties
+      this._isSSRMode = this.options.ssr || this.isServerSide();
+      this._isHydrationMode = this.options.hydration;
+      this._ssrOutput = '';
+      this._hydrationData = {};
 
       this.evaluator = new ExpressionEvaluator(this.state);
       this.parser = new DOMParser(this._initBlocks);
@@ -4594,13 +5044,15 @@
       if (!('_currentPage' in this.state) || !this.state._currentPage) {
         let firstPage = null;
         let allWithPage = [];
-        try {
-          allWithPage = document.querySelectorAll('[\@page]');
-        } catch (e) {
+        if (typeof document !== 'undefined') {
           try {
-            allWithPage = document.querySelectorAll('[@page]');
-          } catch (e2) {
-            allWithPage = [];
+            allWithPage = document.querySelectorAll('[\@page]');
+          } catch (e) {
+            try {
+              allWithPage = document.querySelectorAll('[@page]');
+            } catch (e2) {
+              allWithPage = [];
+            }
           }
         }
         if (allWithPage.length > 0) {
@@ -4612,7 +5064,9 @@
       if (this.isBot && typeof this.isBot === 'function' && this.isBot()) {
         this.renderForSEO();
       }
-      window.ayisha = this;
+      if (typeof window !== 'undefined') {
+        window.ayisha = this;
+      }
     }
 
     component(name, html) {
@@ -4714,7 +5168,11 @@
           if (varName === '_validate') this.state[varName] = {};
           else if (varName === '_currentPage') this.state[varName] = '';
           else if (varName === '_version') this.state[varName] = AyishaVDOM.version;
-          else if (varName === '_locale') this.state[varName] = (navigator.language || navigator.userLanguage || 'en');
+          else if (varName === '_locale') {
+            this.state[varName] = typeof navigator !== 'undefined' 
+              ? (navigator.language || navigator.userLanguage || 'en')
+              : 'en';
+          }
         }
       });
 
@@ -4740,7 +5198,11 @@
       if (!this.state._validate) this.state._validate = {};
       if (!this.state._currentPage) this.state._currentPage = '';
       if (!this.state._version) this.state._version = AyishaVDOM.version;
-      if (!this.state._locale) this.state._locale = (navigator.language || navigator.userLanguage || 'en');
+      if (!this.state._locale) {
+        this.state._locale = typeof navigator !== 'undefined' 
+          ? (navigator.language || navigator.userLanguage || 'en')
+          : 'en';
+      }
 
       // Remove any circular references
       if ('_ayishaInstance' in this.state) {
@@ -4756,11 +5218,17 @@
         return 'xxl';
       };
       const updateScreenVars = () => {
-        this.state._currentBreakpoint = getBreakpoint(window.innerWidth);
-        this.state._screenSize = window.innerWidth;
+        if (typeof window !== 'undefined') {
+          this.state._currentBreakpoint = getBreakpoint(window.innerWidth);
+          this.state._screenSize = window.innerWidth;
+        } else {
+          // SSR defaults
+          this.state._currentBreakpoint = 'lg';
+          this.state._screenSize = 1200;
+        }
       };
       updateScreenVars();
-      if (!this._breakpointListenerAdded) {
+      if (!this._breakpointListenerAdded && typeof window !== 'undefined') {
         window.addEventListener('resize', updateScreenVars);
         this._breakpointListenerAdded = true;
       }
@@ -5877,11 +6345,126 @@
         }
       }, true);
     }
+
+    // NEW: Hydration method for client-side
+    hydrate(hydrationData = null) {
+      // Check if we're in browser and have SSR data
+      if (typeof window !== 'undefined') {
+        const ssrData = hydrationData || window.__AYISHA_HYDRATION_DATA__;
+        if (ssrData && ssrData.state) {
+          // Merge SSR state with current state
+          this.state = { ...this.state, ...ssrData.state };
+          this._isHydrationMode = true;
+        }
+      }
+
+      // Parse existing DOM structure
+      this._vdom = this.parse(this.root);
+
+      // Initialize without re-rendering DOM
+      this._preInitializeEssentialVariables();
+      this._makeReactive();
+      this._runInitBlocks();
+      this.reactivitySystem.enableWatchers();
+      this._setupRouting();
+      this.router.setupCurrentPageProperty();
+
+      // Hydrate event listeners and bindings
+      this._hydrateEventListeners();
+      this._hydrateBindings();
+
+      // Set up component loading
+      this.preloadComponents();
+
+      console.log('🌊 Ayisha.js hydrated successfully');
+      return this;
+    }
+
+    _hydrateEventListeners() {
+      // Find all elements with directives and re-attach event listeners
+      const elementsWithDirectives = this.root.querySelectorAll('[data-ayisha-hydrate="true"]');
+      
+      elementsWithDirectives.forEach(el => {
+        try {
+          const directivesAttr = el.getAttribute('data-ayisha-directives');
+          if (directivesAttr) {
+            const directives = JSON.parse(directivesAttr);
+            const vNode = {
+              tag: el.tagName.toLowerCase(),
+              directives,
+              subDirectives: {}
+            };
+
+            // Apply interactive directives only
+            this._hydrateInteractiveDirectives(vNode, this.state, el);
+          }
+        } catch (e) {
+          console.warn('Failed to hydrate element:', e, el);
+        }
+      });
+    }
+
+    _hydrateInteractiveDirectives(vNode, ctx, el) {
+      // Only hydrate interactive directives that need event listeners
+      const interactiveDirectives = [
+        '@click', '@input', '@change', '@focus', '@blur', '@hover', '@model'
+      ];
+
+      interactiveDirectives.forEach(directive => {
+        if (vNode.directives[directive]) {
+          const directiveInstance = this.directiveManager.getDirective(directive);
+          if (directiveInstance) {
+            try {
+              directiveInstance.apply(vNode, ctx, this.state, el);
+            } catch (e) {
+              console.warn(`Failed to hydrate directive ${directive}:`, e);
+            }
+          }
+        }
+      });
+    }
+
+    _hydrateBindings() {
+      // Re-establish model bindings for form elements
+      const formElements = this.root.querySelectorAll('input, textarea, select');
+      formElements.forEach(el => {
+        const modelAttr = el.getAttribute('@model') || el.getAttribute('data-model');
+        if (modelAttr) {
+          this.bindingManager.bindModel(el, modelAttr, this.state);
+        }
+      });
+    }
   }
 
-  window.AyishaVDOM = AyishaVDOM;
+  // Export for browser
+  if (typeof window !== 'undefined') {
+    window.AyishaVDOM = AyishaVDOM;
+  }
+
+  // Export for Node.js (SSR support)
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AyishaVDOM;
+  }
+
+  // Static method for SSR usage
+  AyishaVDOM.createSSRInstance = function(options = {}) {
+    const mockRoot = {
+      childNodes: [],
+      querySelectorAll: () => [],
+      addEventListener: () => {},
+      innerHTML: ''
+    };
+    return new AyishaVDOM(mockRoot, { ...options, ssr: true });
+  };
+
+  // Static method for easy hydration
+  AyishaVDOM.hydrate = function(root = document.body, hydrationData = null) {
+    return new AyishaVDOM(root, { hydration: true }).hydrate(hydrationData);
+  };
 
   const addDefaultAnimationStyles = () => {
+    if (typeof document === 'undefined') return; // Skip in Node.js
+    
     const existingStyle = document.getElementById('ayisha-default-animations');
     if (!existingStyle) {
       const style = document.createElement('style');
@@ -5937,35 +6520,29 @@
     }
   };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
+  // Browser-only initialization
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        addDefaultAnimationStyles();
+        
+        // Check if we need to hydrate or mount fresh
+        if (typeof window !== 'undefined' && window.__AYISHA_HYDRATION_DATA__) {
+          new AyishaVDOM(document.body).hydrate();
+        } else {
+          new AyishaVDOM(document.body).mount();
+        }
+      });
+    } else {
       addDefaultAnimationStyles();
-      new AyishaVDOM(document.body).mount();
-    });
-  } else {
-    addDefaultAnimationStyles();
-    new AyishaVDOM(document.body).mount();
+      
+      // Check if we need to hydrate or mount fresh
+      if (typeof window !== 'undefined' && window.__AYISHA_HYDRATION_DATA__) {
+        new AyishaVDOM(document.body).hydrate();
+      } else {
+        new AyishaVDOM(document.body).mount();
+      }
+    }
   }
-
-// --- SSR SUPPORT (Node.js) ---
-if (typeof module !== 'undefined' && module.exports) {
-  // Export a function for SSR
-  module.exports = async function ayishaSSR(htmlString) {
-    // Usa JSDOM per simulare il DOM in Node.js
-    const { JSDOM } = require('jsdom');
-    const dom = new JSDOM(htmlString);
-    global.window = dom.window;
-    global.document = dom.window.document;
-    global.navigator = dom.window.navigator;
-
-    // Esegui AyishaVDOM su document.body
-    const vdom = new window.AyishaVDOM(document.body);
-    await vdom.preloadComponents();
-    await vdom.render();
-
-    // Ritorna l'HTML renderizzato
-    return dom.serialize();
-  };
-}
 
 })();

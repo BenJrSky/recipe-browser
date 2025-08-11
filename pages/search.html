@@ -88,7 +88,7 @@
         @fetch="https://www.themealdb.com/api/json/v1/1/search.php?s={searchQuery}" @result="searchResultsData"
         @watch="searchQuery"
         @then="testThen=searchResultsData.meals.length; pippo=searchResultsData.meals; ben='Ben is Great'"
-        @finally="direttiva=true"></div>
+        @finally="direttiva=true; loading=false"></div>
 
     <div @if="searchType === 'ingredient' && searchIngredient && loading"
         @fetch="https://www.themealdb.com/api/json/v1/1/filter.php?i={searchIngredient}" @result="searchResultsData"
