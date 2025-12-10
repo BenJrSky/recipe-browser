@@ -46,13 +46,12 @@
         <h2 style="text-align: center; margin-bottom: 2rem; color: var(--text-dark);">◐ Popular Recipes</h2>
 
         <!-- Carica 6 ricette casuali come popolari -->
-        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe1"></div>
-        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe2"></div>
-        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe3"></div>
-        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe4"></div>
-        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe5"></div>
-        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @result="randomRecipe6"></div>
-
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @wait="10000" @result="randomRecipe1"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @wait="5000" @result="randomRecipe2"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @wait="600" @result="randomRecipe3"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @wait="900" @result="randomRecipe4"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @wait="1200" @result="randomRecipe5"></div>
+        <div @fetch="https://www.themealdb.com/api/json/v1/1/random.php" @wait="1500" @result="randomRecipe6"></div>
         <!-- Combina i risultati -->
         <div @source="[randomRecipe1?.meals?.[0], randomRecipe2?.meals?.[0], randomRecipe3?.meals?.[0], randomRecipe4?.meals?.[0], randomRecipe5?.meals?.[0], randomRecipe6?.meals?.[0]]"
             @filter="item && item.idMeal" @result="popularRecipes"></div>

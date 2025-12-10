@@ -42,6 +42,18 @@
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  function isSafeExpression(expr) {
+    if (!expr || typeof expr !== 'string') return true;
+    // Block creation of functions/eval and direct access to constructor which can be used to escape sandbox
+    const forbidden = /(^|[^A-Za-z0-9_$])(new\s+Function|Function\s*\(|eval\s*\(|\.constructor)\b/i;
+    try {
+      if (forbidden.test(expr)) return false;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function sanitizeHTML(html) {
     if (!html) return '';
     const doc = (new DOMParser()).parseFromString(String(html), 'text/html');
@@ -59,6 +71,62 @@
       node = walker.nextNode();
     }
     return doc.body.innerHTML;
+  }
+
+  function cleanComponentHTML(html) {
+    if (!html) return '';
+    const tpl = document.createElement('template');
+    tpl.innerHTML = String(html);
+    const root = tpl.content;
+
+    root.querySelectorAll('script,iframe,object,embed,link[rel=import]').forEach(e => e.remove());
+
+    // Whitelist tags and attributes. Preserve Ayisha directives starting with '@' and scoped vars '#'.
+    const allowedTags = new Set([
+      'a','abbr','b','br','button','canvas','caption','code','col','colgroup','data','datalist','dd','div','dl','dt',
+      'em','fieldset','figure','figcaption','footer','form','h1','h2','h3','h4','h5','h6','header','hr','i','img','input',
+      'label','legend','li','main','nav','ol','option','p','pre','progress','q','s','section','select','small','span','strong',
+      'sub','sup','table','tbody','td','textarea','tfoot','th','thead','tr','ul','template','slot','svg','init'
+    ]);
+
+    const allowedAttrRe = /^(?:@|data-|aria-|class$|id$|src$|href$|alt$|title$|role$|slot$|name$|type$|value$|style$|width$|height$|viewBox$)/i;
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
+    let node = walker.nextNode();
+    while (node) {
+      const tag = (node.tagName || '').toLowerCase();
+      if (!allowedTags.has(tag)) {
+        // unwrap node but keep its children
+        const parent = node.parentNode;
+        while (node.firstChild) parent.insertBefore(node.firstChild, node);
+        parent.removeChild(node);
+        node = walker.nextNode();
+        continue;
+      }
+
+      Array.from(node.attributes || []).forEach(attr => {
+        const name = attr.name || '';
+        const val = attr.value || '';
+        if (/^on/i.test(name)) {
+          node.removeAttribute(name);
+          return;
+        }
+        if (allowedAttrRe.test(name)) {
+          if ((/^(href|src|xlink:href)$/i).test(name) && /^\s*javascript:/i.test(val)) {
+            node.removeAttribute(name);
+          } else if (name === 'style' && /\bexpression\s*\(/i.test(val)) {
+            node.removeAttribute(name);
+          }
+          return;
+        }
+        if (name.startsWith('@') || name.startsWith('#')) return;
+        node.removeAttribute(name);
+      });
+
+      node = walker.nextNode();
+    }
+
+    return tpl.innerHTML;
   }
 
   class DirectiveCompletionListener {
@@ -284,6 +352,10 @@
       if (/^['"].*['"]$/.test(t)) return t.slice(1, -1);
       if (/^\d+(\.\d+)?$/.test(t)) return Number(t);
       try {
+        if (!isSafeExpression(expr)) {
+          console.error('Blocked unsafe expression in evalExpr:', expr);
+          return undefined;
+        }
         const sp = new Proxy(this.state, {
           get: (o, k) => o[k],
           set: (o, k, v) => { o[k] = v; return true; }
@@ -311,6 +383,10 @@
 
         for (const singleExpr of expressions) {
           if (singleExpr.trim()) {
+            if (!isSafeExpression(singleExpr)) {
+              console.warn('Blocked unsafe expression in executeMultipleExpressions:', singleExpr);
+              return false;
+            }
             new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${singleExpr.trim()}}}`)(sp, ctx, event);
           }
         }
@@ -346,6 +422,10 @@
         }
 
         const cleanCode = processedCode;
+        if (!isSafeExpression(cleanCode)) {
+          console.error('Blocked unsafe expression in executeDirectiveExpression:', cleanCode);
+          return false;
+        }
         new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${cleanCode}}}`)
           (this.state, ctx || {}, event);
 
@@ -653,31 +733,47 @@
       this.loadingComponents = new Map();
     }
 
+    _normalizeKey(url) {
+      if (!url) return url;
+      try {
+        let k = String(url);
+        if (typeof location !== 'undefined' && k.indexOf(location.origin) === 0) {
+          k = k.slice(location.origin.length);
+        }
+        k = k.replace(/^\.{1,2}\//, '');
+        k = k.replace(/^\/+/,'');
+        return k;
+      } catch (e) {
+        return String(url);
+      }
+    }
+
     component(name, html) {
       this.components[name] = html;
     }
 
     async loadExternalComponent(url) {
-      if (this.cache[url]) {
-        return this.cache[url];
+      const key = this._normalizeKey(url);
+      if (this.cache[key]) {
+        return this.cache[key];
       }
 
-      if (this.loadingComponents.has(url)) {
-        return this.loadingComponents.get(url);
+      if (this.loadingComponents.has(key)) {
+        return this.loadingComponents.get(key);
       }
 
       const loadingPromise = this._fetchComponent(url);
-      this.loadingComponents.set(url, loadingPromise);
+      this.loadingComponents.set(key, loadingPromise);
 
       try {
         const html = await loadingPromise;
-        this.cache[url] = html;
+        this.cache[key] = html;
         return html;
       } catch (error) {
         console.error(`❌ ComponentManager: Error loading component ${url}:`, error);
         return null;
       } finally {
-        this.loadingComponents.delete(url);
+        this.loadingComponents.delete(key);
       }
     }
 
@@ -695,11 +791,13 @@
     }
 
     getCachedComponent(url) {
-      return this.cache[url];
+      const key = this._normalizeKey(url);
+      return this.cache[key];
     }
 
     isLoading(url) {
-      return this.loadingComponents.has(url);
+      const key = this._normalizeKey(url);
+      return this.loadingComponents.has(key);
     }
   }
 
@@ -3004,7 +3102,26 @@
       const resultVar = vNode.directives['@result'] || 'result';
       const ctxWithVNode = Object.assign({}, ctx, { _vNode: vNode });
 
-      const fetchPromise = this.fetchManager.setupFetch(autoExpr, resultVar, ctxWithVNode);
+      // Support @wait: delay the fetch by given milliseconds if present
+      let fetchPromise;
+      const waitExpr = vNode.directives && vNode.directives['@wait'];
+      let delay = 0;
+      if (waitExpr) {
+        try {
+          const evalDelay = this.evaluator.evalExpr(waitExpr, ctxWithVNode);
+          delay = parseInt(evalDelay, 10);
+          if (isNaN(delay)) {
+            const parsed = parseInt(String(waitExpr).trim(), 10);
+            delay = isNaN(parsed) ? 0 : parsed;
+          }
+        } catch (e) { delay = 0; }
+      }
+
+      if (delay > 0) {
+        fetchPromise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => this.fetchManager.setupFetch(autoExpr, resultVar, ctxWithVNode));
+      } else {
+        fetchPromise = this.fetchManager.setupFetch(autoExpr, resultVar, ctxWithVNode);
+      }
 
       // SOLO aggiungere task se fetchPromise è una Promise valida
       if (completionListener && fetchPromise && typeof fetchPromise.then === 'function') {
@@ -3039,13 +3156,35 @@
             url = expression;
           }
 
-          const fetchPromise = this.fetchManager.setupFetch(url, resultVar, ctxWithVNode, e, true);
-          if (fetchPromise) {
-            fetchPromise.then(data => {
-              ctxWithVNode._eventResult = data;
-            }).finally(() => { if (done) done(); });
-          } else if (done) {
-            done();
+          // honor @wait when using fetch as sub-directive
+          const waitExpr = vNode.directives && vNode.directives['@wait'];
+          let delay = 0;
+          if (waitExpr) {
+            try {
+              const evalDelay = this.evaluator.evalExpr(waitExpr, ctxWithVNode);
+              delay = parseInt(evalDelay, 10);
+              if (isNaN(delay)) {
+                const parsed = parseInt(String(waitExpr).trim(), 10);
+                delay = isNaN(parsed) ? 0 : parsed;
+              }
+            } catch (err) { delay = 0; }
+          }
+
+          const doFetch = () => {
+            const fetchPromise = this.fetchManager.setupFetch(url, resultVar, ctxWithVNode, e, true);
+            if (fetchPromise) {
+              fetchPromise.then(data => {
+                ctxWithVNode._eventResult = data;
+              }).finally(() => { if (done) done(); });
+            } else if (done) {
+              done();
+            }
+          };
+
+          if (delay > 0) {
+            setTimeout(doFetch, delay);
+          } else {
+            doFetch();
           }
 
         } catch (err) {
@@ -3635,7 +3774,6 @@
           }
         } else {
           executeNow();
-          // Notifica il completionListener per esecuzione immediata
           if (completionListener) {
             setTimeout(() => {
               completionListener.markSyncDone();
@@ -3929,7 +4067,7 @@
         }
 
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = componentHtml;
+        tempDiv.innerHTML = cleanComponentHTML(componentHtml);
         window.ayisha?._processComponentInitBlocks(tempDiv);
         const componentVNode = window.ayisha?.parse(tempDiv);
         if (componentVNode && componentVNode.children) {
@@ -3976,7 +4114,7 @@
             }
 
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = patchedHtml;
+            tempDiv.innerHTML = cleanComponentHTML(patchedHtml);
             window.ayisha?._processComponentInitBlocks(tempDiv);
             if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
               clearTimeout(window.ayisha?._componentRenderTimeout);
@@ -5290,7 +5428,9 @@
       components.forEach(el => {
         const componentName = el.getAttribute('data-component');
         if (this.componentManager && this.componentManager.getComponent(componentName)) {
-          el.innerHTML = this.componentManager.getComponent(componentName);
+          const raw = this.componentManager.getComponent(componentName);
+          const cleaned = cleanComponentHTML(raw);
+          el.innerHTML = cleaned;
         }
       });
     }
@@ -5485,7 +5625,11 @@
         transformed = transformedLines.join('\n');
 
         try {
-          new Function('state', transformed)(this.state);
+          if (!isSafeExpression(transformed)) {
+            console.error('Blocked unsafe init block. Skipping.');
+          } else {
+            new Function('state', transformed)(this.state);
+          }
         } catch (e) {
           console.error('Init error:', e);
         }
@@ -6479,7 +6623,11 @@
         transformed = transformedLines.join('\n');
 
         try {
-          new Function('state', transformed)(this.state);
+          if (!isSafeExpression(transformed)) {
+            console.error('Blocked unsafe component init block. Skipping.');
+          } else {
+            new Function('state', transformed)(this.state);
+          }
         } catch (e) {
           console.error('Component init error:', e, 'Original code:', code, 'Cleaned:', cleanCode, 'Transformed:', transformed);
         }
