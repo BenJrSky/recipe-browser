@@ -44,7 +44,6 @@
 
   function isSafeExpression(expr) {
     if (!expr || typeof expr !== 'string') return true;
-    // Block creation of functions/eval and direct access to constructor which can be used to escape sandbox
     const forbidden = /(^|[^A-Za-z0-9_$])(new\s+Function|Function\s*\(|eval\s*\(|\.constructor)\b/i;
     try {
       if (forbidden.test(expr)) return false;
@@ -81,7 +80,6 @@
 
     root.querySelectorAll('script,iframe,object,embed,link[rel=import]').forEach(e => e.remove());
 
-    // Whitelist tags and attributes. Preserve Ayisha directives starting with '@' and scoped vars '#'.
     const allowedTags = new Set([
       'a','abbr','b','br','button','canvas','caption','code','col','colgroup','data','datalist','dd','div','dl','dt',
       'em','fieldset','figure','figcaption','footer','form','h1','h2','h3','h4','h5','h6','header','hr','i','img','input',
@@ -96,7 +94,6 @@
     while (node) {
       const tag = (node.tagName || '').toLowerCase();
       if (!allowedTags.has(tag)) {
-        // unwrap node but keep its children
         const parent = node.parentNode;
         while (node.firstChild) parent.insertBefore(node.firstChild, node);
         parent.removeChild(node);
@@ -1201,7 +1198,6 @@
         return null;
       }
 
-      // Se lo stesso URL ha già dato errore, non ripetere automaticamente (a meno di force/event)
       if (!force && !event && this.fetched[url]?.error) {
         return null;
       }
@@ -2002,7 +1998,6 @@
       
       if (el) {
         if (!visible) {
-          // Rimuovi l'elemento dal DOM se non visibile
           if (el.parentNode) {
             if (!el._ifPlaceholder) {
               el._ifPlaceholder = document.createComment('if:' + expr);
@@ -2011,7 +2006,6 @@
             el.parentNode.removeChild(el);
           }
         } else {
-          // Ripristina l'elemento nel DOM se visibile
           if (el._ifPlaceholder && el._ifPlaceholder.parentNode) {
             el._ifPlaceholder.parentNode.insertBefore(el, el._ifPlaceholder);
           }
@@ -2034,7 +2028,6 @@
       
       if (el) {
         if (!visible) {
-          // Rimuovi l'elemento dal DOM se non visibile
           if (el.parentNode) {
             if (!el._notPlaceholder) {
               el._notPlaceholder = document.createComment('not:' + expr);
@@ -2043,7 +2036,6 @@
             el.parentNode.removeChild(el);
           }
         } else {
-          // Ripristina l'elemento nel DOM se visibile
           if (el._notPlaceholder && el._notPlaceholder.parentNode) {
             el._notPlaceholder.parentNode.insertBefore(el, el._notPlaceholder);
           }
@@ -2072,14 +2064,13 @@
     setupJson(expr, rk, ctx, event, force) {
       let url = this.evaluator.evalExpr(expr, ctx, event);
 
-      // Heuristica: funzione per rilevare URL "non popolato"
       const isInvalidUrlString = (s) => {
         if (s == null) return true;
         const str = String(s).trim();
         if (!str) return true;
-        if (/\{[^}]+\}/.test(str)) return true;               // placeholder non risolti
-        if (/(^|\/)(undefined|null)(\/|$)/i.test(str)) return true; // segmenti undefined/null
-        if (/\/\.(?:[a-z0-9]+)?(\?|$|#)/i.test(str)) return true;   // '/.json' o '/.'
+        if (/\{[^}]+\}/.test(str)) return true;               
+        if (/(^|\/)(undefined|null)(\/|$)/i.test(str)) return true; 
+        if (/\/\.(?:[a-z0-9]+)?(\?|$|#)/i.test(str)) return true;   
         return false;
       };
 
@@ -2101,7 +2092,6 @@
         url = expr;
       }
 
-      // Se l'URL finale è "non popolato", non avviare la richiesta
       if (isInvalidUrlString(url)) {
         return null;
       }
@@ -2127,7 +2117,6 @@
         }
       }
 
-      // Se lo stesso URL ha già dato errore, non ripetere automaticamente (a meno di force/event)
       if (!force && !event && this.fetched[url]?.error) {
         return null;
       }
@@ -2270,7 +2259,6 @@
       const resultVar = vNode.directives['@result'] || 'result';
       const ctxWithVNode = Object.assign({}, ctx, { _vNode: vNode });
 
-      // Controllare se è cache hit prima di chiamare setupJson
       let url = this.evaluator.evalExpr(autoExpr, ctxWithVNode);
       if (url === undefined) {
         url = autoExpr;
@@ -2691,7 +2679,6 @@
         const raw = typeof expr === 'string' ? expr.trim() : expr;
         let result = this.evalExpr(expr, ctx);
 
-        // Support object literal passed as a plain string (e.g. {'open': mobileNavOpen})
         if ((result === undefined || result === null) && typeof raw === 'string' && raw.startsWith('{') && raw.endsWith('}')) {
           try {
             result = this.evaluator.evalExpr(`(${raw})`, ctx);
@@ -2877,7 +2864,6 @@
           return;
         }
 
-        // Handle simple toggle pattern: foo = !foo
         const toggleMatch = processedCode.match(/^\s*([a-zA-Z_$][\w$]*)\s*=\s*!\s*\1\s*$/);
         if (toggleMatch) {
           const varName = toggleMatch[1];
@@ -3102,7 +3088,6 @@
       const resultVar = vNode.directives['@result'] || 'result';
       const ctxWithVNode = Object.assign({}, ctx, { _vNode: vNode });
 
-      // Support @wait: delay the fetch by given milliseconds if present
       let fetchPromise;
       const waitExpr = vNode.directives && vNode.directives['@wait'];
       let delay = 0;
@@ -3123,7 +3108,6 @@
         fetchPromise = this.fetchManager.setupFetch(autoExpr, resultVar, ctxWithVNode);
       }
 
-      // SOLO aggiungere task se fetchPromise è una Promise valida
       if (completionListener && fetchPromise && typeof fetchPromise.then === 'function') {
         completionListener.addTask(
           fetchPromise.then(data => {
@@ -3132,9 +3116,6 @@
           })
         );
       }
-      // Se fetchPromise è null (cache hit, errore, URL invalido), NON aggiungere task
-
-      // Removed direct handling of @then/@finally here
 
       if (vNode.directives['@watch']) {
         this.handleWatchDirective(vNode, autoExpr, resultVar);
@@ -3156,7 +3137,6 @@
             url = expression;
           }
 
-          // honor @wait when using fetch as sub-directive
           const waitExpr = vNode.directives && vNode.directives['@wait'];
           let delay = 0;
           if (waitExpr) {
@@ -5285,11 +5265,10 @@
 
     _rehydrateVDOM(vNode) {
       if (!vNode || typeof vNode !== 'object') return;
-      // Ricostruisci riferimenti alle classi direttive/componenti
       if (vNode.directives) {
         for (const dir in vNode.directives) {
           if (ModularDirectives[dir]) {
-            vNode.directives[dir] = vNode.directives[dir]; // placeholder, qui puoi aggiungere logica custom se serve
+            vNode.directives[dir] = vNode.directives[dir];
           }
         }
       }
@@ -5397,95 +5376,7 @@
       return /bot|crawler|spider|googlebot|bingbot|facebookexternalhit|twitterbot/i.test(ua);
     }
 
-    async renderForSEO() {
-      this.processAllDirectivesSync();
-      this.loadAllComponentsSync();
-      try {
-        await this.executeAllFetchSync();
-      } catch (e) {
-        console.warn('renderForSEO: some fetches did not complete in time or errored', e);
-      }
-      this.generateMetaTags();
-    }
-
-    processAllDirectivesSync() {
-      Object.keys(ModularDirectives).forEach(dir => {
-        const elements = document.querySelectorAll(`[\\${dir}]`);
-        elements.forEach(el => {
-          const DirectiveClass = ModularDirectives[dir];
-          const directive = new DirectiveClass(this.evaluator, this.bindingManager, this.errorHandler);
-          const vNode = {
-            _el: el,
-            directives: { [dir]: el.getAttribute(dir) }
-          };
-          directive.apply(vNode, this.state, this.state, el);
-        });
-      });
-    }
-
-    loadAllComponentsSync() {
-      const components = document.querySelectorAll('[data-component]');
-      components.forEach(el => {
-        const componentName = el.getAttribute('data-component');
-        if (this.componentManager && this.componentManager.getComponent(componentName)) {
-          const raw = this.componentManager.getComponent(componentName);
-          const cleaned = cleanComponentHTML(raw);
-          el.innerHTML = cleaned;
-        }
-      });
-    }
-
-    async executeAllFetchSync() {
-      const fetchElements = document.querySelectorAll('[\\@fetch]');
-      const fetchPromises = [];
-      fetchElements.forEach(el => {
-        const fetchConfig = el.getAttribute('@fetch');
-        let url = fetchConfig, resultVar = 'result';
-        const asMatch = fetchConfig.match(/(.+) as (\w+)/);
-        if (asMatch) {
-          url = asMatch[1].trim();
-          resultVar = asMatch[2].trim();
-        }
-        try {
-          url = this.evaluator.evalExpr(url, this.state);
-        } catch { }
-        if (!url) return;
-        fetchPromises.push(
-          fetch(url)
-            .then(res => res.json())
-            .then(data => {
-              this.state[resultVar] = data;
-            })
-            .catch(() => { this.state[resultVar] = null; })
-        );
-      });
-      if (fetchPromises.length > 0) {
-        // Wait for all fetches to settle, but don't block the main thread.
-        // Keep previous behaviour: give up after ~2000ms.
-        const allSettledPromise = Promise.allSettled(fetchPromises);
-        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Await whichever finishes first (either all settled or timeout)
-        await Promise.race([allSettledPromise, timeoutPromise]);
-      }
-    }
-
-    generateMetaTags() {
-      const h1 = document.querySelector('h1');
-      if (h1 && !document.title) {
-        document.title = h1.textContent;
-      }
-      const content = document.body.textContent.slice(0, 160);
-      if (!document.querySelector('meta[name="description"]')) {
-        const meta = document.createElement('meta');
-        meta.name = 'description';
-        meta.content = content;
-        document.head.appendChild(meta);
-      }
-    }
-
-
-    static version = "1.0.4";
+    static version = "1.1.0";
 
     constructor(root = document.body, options = {}) {
       this.options = {
@@ -5549,9 +5440,6 @@
         this.state._currentPage = firstPage || 'home';
       }
 
-      if (this.isBot && typeof this.isBot === 'function' && this.isBot()) {
-        this.renderForSEO().catch(() => { });
-      }
       if (typeof window !== 'undefined') {
         window.ayisha = this;
       }
@@ -6230,14 +6118,12 @@
 
       let completionListener = null;
       if (vNode && vNode.directives && Object.keys(vNode.directives).length > 0) {
-        // Escludi @then e @finally dal conteggio per evitare loop
         const hasOtherDirectives = Object.keys(vNode.directives)
           .some(key => key !== '@then' && key !== '@finally');
 
         if (hasOtherDirectives || vNode.directives['@then'] || vNode.directives['@finally']) {
           completionListener = new DirectiveCompletionListener(vNode, mergedCtx, this);
 
-          // Registra @then e @finally se presenti
           if (vNode.directives['@then']) {
             completionListener.addThen(vNode.directives['@then']);
           }
@@ -6873,13 +6759,10 @@
     window.AyishaVDOM = AyishaVDOM;
   }
 
-  const Ayisha = AyishaVDOM;
-
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { AyishaVDOM, Ayisha: AyishaVDOM };
     module.exports.default = AyishaVDOM;
   } else if (typeof define === 'function' && define.amd) {
-    // AMD
     define([], function () {
       return { AyishaVDOM, Ayisha: AyishaVDOM, default: AyishaVDOM };
     });

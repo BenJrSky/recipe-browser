@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ayisha.js — Guida alle Direttive (Live)</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial; color:#1f2937; background:#f8fafc; padding:24px; }
+    .wrap{max-width:1100px;margin:0 auto;background:#fff;border-radius:12px;padding:20px 28px;box-shadow:0 8px 30px rgba(15,23,42,0.06)}
+    h1{font-size:26px;margin-bottom:6px}
+    p.lead{color:#475569}
+    nav.toc{margin:14px 0;padding:10px;background:#f1f5f9;border-radius:8px}
+    nav.toc a{display:inline-block;margin:6px 8px;color:#0f172a;text-decoration:none}
+    section.directive{border-top:1px dashed #e6eef7;padding:16px 0}
+    section.directive:first-of-type{border-top:none}
+    .directive h3{margin:0 0 8px}
+    .meta{color:#475569;font-size:13px;margin-bottom:8px}
+    pre{background:#0f172a;color:#e6eef7;padding:12px;border-radius:8px;overflow:auto}
+    code{background:#eef2ff;padding:2px 6px;border-radius:4px}
+    .example{margin-top:8px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .card{padding:12px;border-radius:8px;border:1px solid #e6eef7;background:#fff}
+    .small{font-size:13px;color:#475569}
+    footer{margin-top:18px;color:#64748b;font-size:13px}
+    init{display:none !important}
+  </style>
+  <script src="/ayisha-1.0.2.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Ayisha.js — Guida alle direttive (Live)</h1>
+    <p class="lead">Pagina di riferimento con esempi funzionanti. Tutti gli esempi sono eseguiti da Ayisha quando la pagina è caricata.</p>
+
+    <nav class="toc">
+      <strong>Indice rapido:</strong>
+      <a href="#fetch">@fetch</a>
+      <a href="#json">@json</a>
+      <a href="#for">@for</a>
+      <a href="#if">@if / @not / @when</a>
+      <a href="#model">@model / @form</a>
+      <a href="#class">@class / @style</a>
+      <a href="#text">@text / @attr</a>
+      <a href="#component">@component / @src / @scope</a>
+      <a href="#misc">Altre direttive</a>
+    </nav>
+
+    <!-- FETCH -->
+    <section id="fetch" class="directive">
+      <h3>@fetch</h3>
+      <div class="meta">Carica dati via HTTP e salva il risultato in una variabile di stato. Supporta sub-direttive evento (<code>@fetch:click</code>), <code>@result</code>, <code>@method</code>, <code>@payload</code>, <code>@headers</code> e <code>@wait</code>.</div>
+      <div class="example row">
+        <div class="card" style="flex:1">
+          <strong>Esempio automatico</strong>
+          <div @fetch="'https://jsonplaceholder.typicode.com/users/1'" @result="user_example">User: <span @text="user_example.name"></span></div>
+        </div>
+        <div class="card" style="flex:1">
+          <strong>Esempio su click</strong>
+          <button @fetch:click="'https://jsonplaceholder.typicode.com/posts/1'" @result="post_example">Carica post</button>
+          <pre @text="JSON.stringify(post_example, null, 2)"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- JSON -->
+    <section id="json" class="directive">
+      <h3>@json</h3>
+      <div class="meta">Carica file JSON locali (solo GET) e salva il contenuto in una variabile.</div>
+      <div class="example">
+        <div class="card">
+          <strong>Esempio (richiede /examples/sample.json nel progetto)</strong>
+          <div @json="'/examples/sample.json'" @result="local_json"></div>
+          <pre @text="JSON.stringify(local_json, null, 2)"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOR -->
+    <section id="for" class="directive">
+      <h3>@for</h3>
+      <div class="meta">Itera su array o oggetti per generare elementi ripetuti.</div>
+      <div class="example row">
+        <div class="card" style="flex:1">
+          <init>state.items = state.items || [{id:1,name:'Apple'},{id:2,name:'Banana'},{id:3,name:'Orange'}];</init>
+          <strong>Lista</strong>
+          <ul>
+            <li @for="i, item in items"> <span @text="i + ': ' + item.name"></span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- IF / NOT / WHEN -->
+    <section id="if" class="directive">
+      <h3>@if / @not / @when</h3>
+      <div class="meta">Controllo condizionale; <code>@when</code> esegue azioni al cambiamento della condizione. Supporta <code>@wait</code>.</div>
+      <div class="example row">
+        <div class="card">
+          <init>state.count = state.count || 0; state.isAdmin = !!state.isAdmin;</init>
+          <button @click="count++">Incrementa count</button> (<span @text="count"></span>)
+          <div @if="count >= 5">Hai 5 o più elementi</div>
+          <div @not="isAdmin">Solo non-admin</div>
+          <button @click="isAdmin = !isAdmin">Toggle admin</button>
+        </div>
+        <div class="card">
+          <init>state.user = state.user || { logged: false };</init>
+          <button @click="user.logged = true">Simula login</button>
+          <div @when="user.logged" @do="(state.welcome = 'Benvenuto!')"></div>
+          <div @text="welcome"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODEL / FORM -->
+    <section id="model" class="directive">
+      <h3>@model / @form</h3>
+      <div class="meta">Two-way binding per input; <code>@form</code> aggrega campi e calcola validità.</div>
+      <div class="example row">
+        <div class="card">
+          <init>state.name = state.name || 'Mario';</init>
+          <label>Nome: <input @model="name" placeholder="Nome"></label>
+          <p>Valore: <strong @text="name"></strong></p>
+        </div>
+        <div class="card">
+          <init>state.email = state.email || '';</init>
+          <form @form="myForm">
+            <label>Email: <input type="email" @model="email" @validate="required"></label>
+          </form>
+          <div class="small">_validate.myForm: <span @text="_validate.myForm"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CLASS / STYLE -->
+    <section id="class" class="directive">
+      <h3>@class / @style</h3>
+      <div class="meta">Applica classi dinamiche o stili inline da un oggetto.</div>
+      <div class="example row">
+        <div class="card">
+          <init>state.open = !!state.open; state.textColor = state.textColor || '#0ea5a4'; state.fontSize = state.fontSize || 16;</init>
+          <button @click="open = !open">Toggle</button>
+          <div @class="{ 'is-open': open }" style="padding:8px;border:1px solid #ddd;">Apertura: <span @text="open"></span></div>
+          <div @style="{ color: textColor, fontSize: fontSize + 'px' }">Testo stilizzato</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TEXT / ATTR -->
+    <section id="text" class="directive">
+      <h3>@text / @attr</h3>
+      <div class="meta">Imposta testo o attributi dinamicamente; supporta sub-direttive evento come <code>@text:hover</code>.</div>
+      <div class="example row">
+        <div class="card">
+          <init>state.user = state.user || { name: 'Luca' };</init>
+          <span @text="user.name || 'Anonimo'"></span>
+          <img @attr="{ src: 'https://via.placeholder.com/80', alt: user.name }" style="width:80px;height:80px;display:block;margin-top:8px;">
+          <div @text:hover="'Hai passato il mouse!'" style="padding:6px;border:1px solid #ddd;display:inline-block;margin-top:8px;">Passami sopra</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPONENTI -->
+    <section id="component" class="directive">
+      <h3>@component / @src / @scope</h3>
+      <div class="meta">Registra componenti con <code>ayisha.component</code> o carica esterni con <code>@src</code>. <code>@scope</code> isola variabili per istanza.</div>
+      <div class="example row">
+        <div class="card" style="flex:1">
+          <init>
+            try {
+              if (typeof ayisha !== 'undefined' && ayisha.component) {
+                ayisha.component('simple-card', `<div style="border:1px solid #ddd;padding:8px;border-radius:6px;"><h4>{{name}}</h4><p>{{email}}</p></div>`);
+              }
+            } catch(e) {}
+            state.cardUser = state.cardUser || { name: 'Anna', email: 'anna@example.com' };
+          </init>
+          <div @component="simple-card" prop-name="cardUser.name" prop-email="cardUser.email"></div>
+        </div>
+        <div class="card" style="flex:1">
+          <strong>Carica un componente esterno (se disponibile)</strong>
+          <component @src="'/components/header.html'"></component>
+        </div>
+      </div>
+    </section>
+
+    <!-- MISC: set / then / finally / watch / file / link / state / log / key / error / no -->
+    <section id="misc" class="directive">
+      <h3>Altre direttive (esempi)</h3>
+      <div class="meta">Esempi rapidi e funzionanti per direttive minori.</div>
+
+      <div class="example row">
+        <div class="card">
+          <strong>@set</strong>
+          <div @set="demoA=123;;demoB='ok'">Esegui @set</div>
+          <div>demoA: <span @text="demoA"></span> demoB: <span @text="demoB"></span></div>
+        </div>
+
+        <div class="card">
+          <strong>@then / @finally</strong>
+          <div @fetch="'https://jsonplaceholder.typicode.com/todos/1'" @result="todo_example" @then="loaded = true" @finally="finished = true">Carica todo</div>
+          <div>loaded: <span @text="loaded"></span> finished: <span @text="finished"></span></div>
+        </div>
+
+        <div class="card">
+          <strong>@watch</strong>
+          <init>state.log = state.log || [];</init>
+          <input @model="watched" placeholder="cambia qui">
+          <div @watch="watched => log.push('changed: '+watched)"></div>
+          <ul><li @for="i,entry in log" @text="entry"></li></ul>
+        </div>
+
+        <div class="card">
+          <strong>@file</strong>
+          <input type="file" @file="pic">
+          <img @attr="{ src: pic }" style="max-width:120px;display:block;margin-top:8px;">
+        </div>
+
+        <div class="card">
+          <strong>@link / @go / @page</strong>
+          <a href="#" @link="/home">Vai a Home</a>
+          <div @page="home">Questa è la pagina Home (visibile se _currentPage == 'home')</div>
+        </div>
+
+        <div class="card">
+          <strong>@state</strong>
+          <div @state></div>
+        </div>
+
+        <div class="card">
+          <strong>@key</strong>
+          <init>state.people = state.people || [{id:10,name:'A'},{id:20,name:'B'}];</init>
+          <ul><li @for="i, p in people" @key="p.id"> <span @text="p.name"></span></li></ul>
+        </div>
+
+        <div class="card">
+          <strong>no (tag)</strong>
+          <no>{{'{{should-not-eval}}'}}</no>
+        </div>
+      </div>
+
+      <p class="small">Nota: le sub-direttive evento sono supportate da molte direttive, ad esempio <code>@fetch:click</code>, <code>@model:input</code>, <code>@class:hover</code>, <code>@text:click</code> e simili.</p>
+    </section>
+
+    <footer>
+      Pagina generata: <code>directives-reference.html</code>. Vuoi che committiamo il file o che lo includa in <code>index.html</code> o <code>test.html</code>? Posso anche generare una versione Markdown per il README.
+    </footer>
+  </div>
+</body>
+</html>
