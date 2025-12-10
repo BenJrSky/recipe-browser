@@ -1,3 +1,4 @@
+
 /*!
  * Ayisha.js - Complete Modular Directive System
  * (c) 2023 devBen - Benito Massidda
@@ -5,7 +6,8 @@
  */
 
 (function () {
-  // Allow loading in Node.js for SSR
+
+
   if (typeof window !== 'undefined' && window.AyishaVDOM) return;
 
   class AyishaErrorBus {
@@ -33,6 +35,30 @@
     onError(fn) {
       this.listeners.push(fn);
     }
+  }
+
+  function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function sanitizeHTML(html) {
+    if (!html) return '';
+    const doc = (new DOMParser()).parseFromString(String(html), 'text/html');
+    const removeEls = Array.from(doc.querySelectorAll('script,iframe,object,embed'));
+    removeEls.forEach(e => e.remove());
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT, null, false);
+    let node = walker.nextNode();
+    while (node) {
+      Array.from(node.attributes || []).forEach(attr => {
+        const name = attr.name || '';
+        const val = attr.value || '';
+        if (/^on/i.test(name)) node.removeAttribute(name);
+        if ((/^(href|src|xlink:href)$/i).test(name) && /^\s*javascript:/i.test(val)) node.removeAttribute(name);
+      });
+      node = walker.nextNode();
+    }
+    return doc.body.innerHTML;
   }
 
   class DirectiveCompletionListener {
@@ -69,7 +95,6 @@
         this.thenQueue.push(expr);
       }
 
-      // NUOVO: Pre-inizializza le variabili target degli assignment
       this._preInitializeVariablesFromExpressions(expr);
     }
 
@@ -82,11 +107,9 @@
         this.finallyQueue.push(expr);
       }
 
-      // NUOVO: Pre-inizializza le variabili target degli assignment
       this._preInitializeVariablesFromExpressions(expr);
     }
 
-    // NUOVO METODO: Estrae e pre-inizializza le variabili target degli assignment
     _preInitializeVariablesFromExpressions(expr) {
       if (!expr || !this.ayisha?.evaluator) return;
 
@@ -103,40 +126,29 @@
       expressions.forEach(expression => {
         if (typeof expression !== 'string') return;
 
-        // Estrai tutte le assegnazioni: variabile = valore
         const assignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)\s*=\s*[^=]/g;
         let match;
 
         while ((match = assignmentRegex.exec(expression)) !== null) {
           const fullVariablePath = match[1].trim();
 
-          // Gestisci sia variabili semplici che nested (es: user.name)
           if (fullVariablePath.includes('.')) {
-            // Per variabili nested come "user.name", inizializza l'oggetto root
             const rootVar = fullVariablePath.split('.')[0];
             this._ensureVariableInState(rootVar, 'object');
 
-            // Crea la struttura nested se necessario
             this._ensureNestedPath(fullVariablePath);
           } else {
-            // Per variabili semplici, prova a indovinare il tipo dal contesto
             this._ensureVariableInState(fullVariablePath, 'auto');
           }
         }
       });
     }
 
-    // NUOVO: Helper per assicurarsi che una variabile esista nello state
     _ensureVariableInState(varName, type = 'auto') {
       if (!varName || !this.ayisha?.evaluator?.state) return;
-
-      // Verifica che sia un nome di variabile valido
       if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(varName)) return;
-
-      // Non sovrascrivere se esiste già
       if (varName in this.ayisha.evaluator.state) return;
 
-      // Skip variabili globali JavaScript
       const jsGlobals = [
         'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp',
         'console', 'window', 'document', 'setTimeout', 'setInterval', 'fetch', 'localStorage',
@@ -168,13 +180,12 @@
     }
 
     _ensureNestedPath(fullPath) {
-      // Usa la utility centralizzata per la gestione dei path annidati
       if (!fullPath || !this.ayisha?.evaluator?.state) return;
       AyishaNestedUtil.setNested(this.ayisha.evaluator.state, fullPath, undefined);
     }
 
     _onComplete() {
-      if (this.done) return; // Prevent further completions if already done
+      if (this.done) return;
       this.completed++;
       if (this.completed > this.total) this.completed = this.total;
       this._checkCompletion();
@@ -202,9 +213,9 @@
                 expr();
               } else {
                 if (this.ctx && typeof this.ctx._eventResult !== 'undefined') {
-                  this.ayisha.evaluator.executeDirectiveExpression(expr, this.ctx, this.ctx._eventResult, true);
+                  this.ayisha.evaluator.executeDirectiveExpression(expr, this.ctx, this.ctx._eventResult, false);
                 } else {
-                  this.ayisha.evaluator.executeDirectiveExpression(expr, this.ctx, null, true);
+                  this.ayisha.evaluator.executeDirectiveExpression(expr, this.ctx, null, false);
                 }
               }
             } catch (e) {
@@ -218,7 +229,7 @@
                   if (typeof expr === 'function') {
                     expr();
                   } else {
-                    this.ayisha.evaluator.executeDirectiveExpression(expr, this.ctx, null, true);
+                    this.ayisha.evaluator.executeDirectiveExpression(expr, this.ctx, null, false);
                   }
                 } catch (e) {
                   console.error('Error executing @finally:', e, 'Expression:', expr);
@@ -235,7 +246,7 @@
                 if (typeof expr === 'function') {
                   expr();
                 } else {
-                  this.ayisha.evaluator.executeDirectiveExpression(expr, this.ctx, null, true);
+                  this.ayisha.evaluator.executeDirectiveExpression(expr, this.ctx, null, false);
                 }
               } catch (e) {
                 console.error('Error executing @finally:', e, 'Expression:', expr);
@@ -322,7 +333,14 @@
       try {
         if (this.executeMultipleExpressions(processedCode, ctx, event)) {
           if (triggerRender) {
-            setTimeout(() => window.ayisha && window.ayisha.render(), 0);
+            if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
+              clearTimeout(window.ayisha?._componentRenderTimeout);
+              window.ayisha._componentRenderQueued = true;
+              window.ayisha._componentRenderTimeout = setTimeout(() => {
+                window.ayisha._componentRenderQueued = false;
+                window.ayisha.render();
+              }, 0);
+            }
           }
           return true;
         }
@@ -332,7 +350,14 @@
           (this.state, ctx || {}, event);
 
         if (triggerRender) {
-          setTimeout(() => window.ayisha && window.ayisha.render(), 0);
+          if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
+            clearTimeout(window.ayisha?._componentRenderTimeout);
+            window.ayisha._componentRenderQueued = true;
+            window.ayisha._componentRenderTimeout = setTimeout(() => {
+              window.ayisha._componentRenderQueued = false;
+              window.ayisha.render();
+            }, 0);
+          }
         }
         return true;
       } catch (error) {
@@ -455,13 +480,12 @@
     }
 
     hasInterpolation(expr) {
-      return /\{\{.*?\}\}|\{[\w$.]+\}/.test(expr);
+      return /\{\{.*?\}\}|\{[\w$][\w\d$]*(?:\.[\w$][\w\d$]*|\[[^\]]+\])*\}/.test(expr);
     }
 
     ensureVarInState(expr, forceString = false, inputType = null) {
       if (typeof expr !== 'string') return;
 
-      // Reject expressions that contain operators or invalid characters
       if (expr.includes('=') || expr.includes('<') || expr.includes('>') ||
         expr.includes('!') || expr.includes('&') || expr.includes('|') ||
         expr.includes("'") || expr.includes('"') || expr.includes('(') ||
@@ -470,7 +494,7 @@
         expr.includes('%') || expr.includes('[') || expr.includes(']') ||
         expr.includes('{') || expr.includes('}') || expr.includes('?') ||
         expr.includes(':') || expr.includes(';') || expr.includes(',')) {
-        return; // Don't create variables for complex expressions
+        return;
       }
 
       const jsGlobals = [
@@ -490,9 +514,8 @@
 
       const varName = expr.split('.')[0];
 
-      // Additional check: only allow valid JavaScript identifier names
       if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(varName)) {
-        return; // Don't create variables with invalid names
+        return;
       }
 
       if (!jsGlobals.includes(varName) && !(varName in this.state)) {
@@ -524,7 +547,6 @@
 
         if (jsGlobals.includes(rootVar)) return;
 
-        // Additional check for dot notation
         if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(rootVar)) {
           return;
         }
@@ -605,6 +627,9 @@
           } else {
             vNode.directives[attr.name] = attr.value;
           }
+        } else if (attr.name.startsWith('#')) {
+          if (!vNode.scopedVars) vNode.scopedVars = {};
+          vNode.scopedVars[attr.name.slice(1)] = attr.value;
         } else {
           vNode.attrs[attr.name] = attr.value;
         }
@@ -729,7 +754,6 @@
         configurable: true
       });
 
-      // Helper to wrap array mutating methods
       const renderCallback = this.renderCallback;
       const wrapArray = (arr, prop) => {
         if (!Array.isArray(arr) || arr._ayishaWrapped) return arr;
@@ -737,7 +761,7 @@
         mutatingMethods.forEach(method => {
           if (typeof arr[method] === 'function') {
             const original = arr[method];
-            arr[method] = function(...args) {
+            arr[method] = function (...args) {
               const result = original.apply(this, args);
               if (typeof renderCallback === 'function') renderCallback();
               return result;
@@ -763,11 +787,9 @@
             return true;
           }
 
-          // --- Track previous value in a parallel state ---
           if (!obj._prevValues) obj._prevValues = {};
           obj._prevValues[prop] = obj[prop];
 
-          // --- Track history (optional, legacy) ---
           if (!this._historyValues[prop]) this._historyValues[prop] = [];
           if (Object.prototype.hasOwnProperty.call(obj, prop)) {
             this._historyValues[prop].push(obj[prop]);
@@ -780,11 +802,15 @@
             return true;
           }
 
+          if (this._isRendering) {
+            obj[prop] = val;
+            return true;
+          }
+
           this._isUpdating = true;
           obj[prop] = val;
 
           if (this.watchersReady && this.watchers[prop]) {
-            // Check watcher type: oneShot or reactive
             if (this._watcherTypes[prop] === 'oneShot') {
               if (!this._watcherOneShotFired[prop]) {
                 this._watcherOneShotFired[prop] = true;
@@ -798,7 +824,6 @@
                 });
               }
             } else {
-              // reactive: trigger on every change
               if (this._safeStringify(this._prevValues[prop]) !== this._safeStringify(val)) {
                 this._prevValues[prop] = val;
                 this.watchers[prop].forEach(fn => {
@@ -819,7 +844,16 @@
           this._renderTimeout = setTimeout(() => {
             this._isUpdating = false;
             this._renderTimeout = null;
-            this.renderCallback();
+            if (typeof this.renderCallback === 'function') {
+              if (!this._isRendering) {
+                this._isRendering = true;
+                try {
+                  this.renderCallback();
+                } finally {
+                  this._isRendering = false;
+                }
+              }
+            }
           }, 10);
 
           return true;
@@ -846,7 +880,6 @@
       if (!(prop in this._prevValues)) {
         this._prevValues[prop] = this.state[prop];
       }
-      // NEW: set watcher type
       if (options.oneShot) {
         this._watcherTypes[prop] = 'oneShot';
         this._watcherOneShotFired[prop] = false;
@@ -858,7 +891,6 @@
 
     enableWatchers() {
       this.watchersReady = true;
-      // reset all one-shot flags on enable (e.g. on remount)
       Object.keys(this._watcherOneShotFired).forEach(k => {
         this._watcherOneShotFired[k] = false;
       });
@@ -878,13 +910,39 @@
         p = '';
       }
 
-      if (!this.state._currentPage) {
-        this.state._currentPage = p;
+      let segments = p.split('/').filter(Boolean);
+      if (!segments[0]) {
+        let firstPage = null;
+        if (typeof document !== 'undefined') {
+          try {
+            const allWithPage = document.querySelectorAll('[\@page]');
+            if (allWithPage.length > 0) {
+              firstPage = allWithPage[0].getAttribute('@page');
+            }
+          } catch (e) { }
+        }
+        segments = [(firstPage || (this.state._currentPage && this.state._currentPage !== '' ? this.state._currentPage : 'home'))];
       }
+      this.state._currentPage = segments[0] || '';
+      this.state._params = segments.slice(1);
 
       window.addEventListener('popstate', () => {
         const newPath = location.pathname.replace(/^\//, '') || '';
-        this.state._currentPage = newPath;
+        let segs = newPath.split('/').filter(Boolean);
+        if (!segs[0]) {
+          let firstPage = null;
+          if (typeof document !== 'undefined') {
+            try {
+              const allWithPage = document.querySelectorAll('[\@page]');
+              if (allWithPage.length > 0) {
+                firstPage = allWithPage[0].getAttribute('@page');
+              }
+            } catch (e) { }
+          }
+          segs = [(firstPage || (this.state._currentPage && this.state._currentPage !== '' ? this.state._currentPage : 'home'))];
+        }
+        this.state._currentPage = segs[0] || '';
+        this.state._params = segs.slice(1);
         this.renderCallback();
       });
     }
@@ -905,13 +963,14 @@
       });
     }
 
-    // Nuovo metodo per navigare programmaticamente
     navigate(path) {
-      if (path.startsWith('/')) {
-        this.state._currentPage = path.substring(1);
-      } else {
-        this.state._currentPage = path;
-      }
+      let clean = path.startsWith('/') ? path.substring(1) : path;
+      const segments = clean.split('/').filter(Boolean);
+      this.state._currentPage = segments[0] || '';
+      this.state._params = segments.slice(1);
+      const url = '/' + segments.join('/');
+      history.pushState({}, '', url);
+      this.renderCallback();
     }
   }
 
@@ -922,32 +981,64 @@
       this.lastFetchUrl = {};
       this.fetched = {};
       this.readyPromise = {};
+      this.cacheBySignature = new Map();
+      this.inflightBySignature = new Map();
     }
 
 
     setupFetch(expr, rk, ctx, event, force) {
       let url = this.evaluator.evalExpr(expr, ctx, event);
+
+      const isInvalidUrlString = (s) => {
+        if (s == null) return true;
+        const str = String(s).trim();
+        if (!str) return true;
+        if (/\{[^}]+\}/.test(str)) return true;
+        if (/(^|\/)(undefined|null)(\/|$)/i.test(str)) return true;
+        if (/\/\.(?:[a-z0-9]+)?(\?|$|#)/i.test(str)) return true;
+        return false;
+      };
+
       if (url === undefined) {
+        let missingPlaceholder = false;
         url = expr.replace(/\{([^}]+)\}/g, (_, key) => {
           const val = this.evaluator.evalExpr(key, ctx, event);
-          return val != null ? val : '';
+          if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) {
+            missingPlaceholder = true;
+            return '';
+          }
+          return String(val);
         });
+        if (missingPlaceholder) {
+          return null;
+        }
       }
       if (url === undefined || url === null) {
         url = expr;
       }
-      if (!url) return Promise.resolve(undefined);
 
-      // FIX: Se l'URL è assoluto (http/https), non modificarlo
+      if (isInvalidUrlString(url)) {
+        return null;
+      }
+
+      if (!url) return null;
+
+      if (typeof url === 'string') {
+        url = url.trim();
+        const first = url[0], last = url[url.length - 1];
+        if (first && first === last && (first === '`' || first === '"' || first === "'")) {
+          url = url.slice(1, -1).trim();
+        }
+      }
+
       if (!/^https?:\/\//.test(url)) {
-        url = url.replace(/\/+$/, ''); // rimuove slash finale
-        url = url.replace(/\?$/, ''); // rimuove ? finale
-        url = url.replace(/\?&/, '?'); // rimuove & subito dopo ?
-        url = url.replace(/\?$/, ''); // rimuove ? finale ancora
-        url = url.replace(/\&+$/, ''); // rimuove & finale
-        url = url.replace(/\?page=(&|$)/, '?').replace(/\?$/, ''); // rimuove page vuoto
-        url = url.replace(/\/\//g, '/'); // rimuove doppio slash
-        // Se l'URL non inizia con "/", aggiungi la base
+        url = url.replace(/\/+$/, '');
+        url = url.replace(/\?$/, '');
+        url = url.replace(/\?&/, '?');
+        url = url.replace(/\?$/, '');
+        url = url.replace(/\&+$/, '');
+        url = url.replace(/\?page=(&|$)/, '?').replace(/\?$/, '');
+        url = url.replace(/\/\//g, '/');
         if (!url.startsWith('/')) {
           url = '/' + url;
         }
@@ -955,41 +1046,6 @@
       }
 
       const fid = `${url}::${rk}`;
-
-
-      if (!force && !event && this.lastFetchUrl[fid]) {
-        if (!this.readyPromise[fid]) {
-          this.readyPromise[fid] = Promise.resolve(this.evaluator.state[rk]);
-          return this.readyPromise[fid];
-        }
-        return;
-      }
-
-      if (!force && this.lastFetchUrl[fid] && JSON.stringify(this.lastFetchUrl[fid]) === JSON.stringify({ url, value: this.evaluator.state[rk] })) {
-        if (!this.readyPromise[fid]) {
-          this.readyPromise[fid] = Promise.resolve(this.evaluator.state[rk]);
-          return this.readyPromise[fid];
-        }
-        return;
-      }
-
-      if (this.pendingFetches[fid]) return Promise.resolve(this.evaluator.state[rk]);
-
-      if (rk && typeof rk === 'string' && rk in this.evaluator.state) {
-        this.evaluator.state[rk] = null;
-      }
-
-      if (this.readyPromise[fid]) delete this.readyPromise[fid];
-
-      this.pendingFetches[fid] = true;
-      this.lastFetchUrl[fid] = { url, value: this.evaluator.state[rk] };
-
-      this.pendingFetches[fid] = true;
-      this.lastFetchUrl[rk] = url;
-
-      if (!(rk in this.evaluator.state)) {
-        this.evaluator.state[rk] = null;
-      }
 
       let method = 'GET';
       let payload = null;
@@ -1011,7 +1067,6 @@
             method = 'GET';
           }
         }
-        // PATCH: payload anche per PUT/PATCH/DELETE oltre che POST
         if (ctx._vNode.directives && ctx._vNode.directives['@payload']) {
           payload = this.evaluator.evalExpr(ctx._vNode.directives['@payload'], ctx, event);
         }
@@ -1020,9 +1075,66 @@
         }
       }
 
+      const sortObject = (o) => {
+        if (Array.isArray(o)) return o.map(sortObject);
+        if (o && typeof o === 'object') {
+          return Object.keys(o).sort().reduce((acc, k) => (acc[k] = sortObject(o[k]), acc), {});
+        }
+        return o;
+      };
+      const stableStringify = (o) => {
+        try { return JSON.stringify(sortObject(o)); } catch { return JSON.stringify(o); }
+      };
+      const normHeaders = (customHeaders && typeof customHeaders === 'object') ? sortObject(customHeaders) : customHeaders;
+      const normPayloadStr = payload != null && typeof payload === 'object' ? stableStringify(payload) : (payload != null ? String(payload) : '');
+      const signature = `${method} ${url} ${normPayloadStr} ${normHeaders ? stableStringify(normHeaders) : ''}`;
+
+      if (!force && !event && this.inflightBySignature.has(signature)) {
+        const p = this.inflightBySignature.get(signature);
+        this.readyPromise[fid] = p;
+        return p;
+      }
+
+      if (!force && !event && this.cacheBySignature.has(signature)) {
+        const cached = this.cacheBySignature.get(signature);
+        if (this.evaluator.state[rk] !== cached) {
+          this.evaluator.state[rk] = cached;
+        }
+        return null;
+      }
+
+      // Se lo stesso URL ha già dato errore, non ripetere automaticamente (a meno di force/event)
+      if (!force && !event && this.fetched[url]?.error) {
+        return null;
+      }
+
+      if (this.pendingFetches[fid]) {
+        const p =
+          this.inflightBySignature.get(signature) ||
+          this.readyPromise[fid] ||
+          Promise.resolve(this.evaluator.state[rk]);
+        this.readyPromise[fid] = p;
+        return p;
+      }
+
+      if (rk && typeof rk === 'string' && rk in this.evaluator.state) {
+        this.evaluator.state[rk] = null;
+      }
+
+      if (this.readyPromise[fid]) delete this.readyPromise[fid];
+
+      this.pendingFetches[fid] = true;
+      this.lastFetchUrl[fid] = { url, value: this.evaluator.state[rk] };
+
+      this.pendingFetches[fid] = true;
+      this.lastFetchUrl[rk] = url;
+
+      if (!(rk in this.evaluator.state)) {
+        this.evaluator.state[rk] = null;
+      }
+
       const fetchOptions = { method };
       let headers = {};
-      // PATCH: payload per tutti i metodi diversi da GET/HEAD
       if (payload != null && method && !['GET', 'HEAD'].includes(method.toUpperCase())) {
         if (typeof payload === 'object') {
           fetchOptions.body = JSON.stringify(payload);
@@ -1054,7 +1166,6 @@
               } catch (e) {
                 parsedError = errorBody || `${res.status} ${res.statusText || 'errore di rete'}`;
               }
-              // Always set _error and custom errorVar, and also window._error for debugging
               const errorObj = {
                 error: parsedError && parsedError.error ? parsedError.error : `${res.status} ${res.statusText}`,
                 details: parsedError && parsedError.details ? parsedError.details : parsedError
@@ -1076,8 +1187,9 @@
           if (!isEqual) {
             this.evaluator.state[rk] = data;
           }
+          this.cacheBySignature.set(signature, data);
+          this.readyPromise[fid] = Promise.resolve(data);
           if (this.fetched[url]) delete this.fetched[url].error;
-          // Always clear both _error and custom errorVar
           this.evaluator.state['_error'] = null;
           let errorVar = '_error';
           if (ctx && ctx._vNode && ctx._vNode.directives && ctx._vNode.directives['@error']) {
@@ -1096,7 +1208,6 @@
           if (ctx && ctx._vNode && ctx._vNode.directives && ctx._vNode.directives['@error']) {
             errorVar = ctx._vNode.directives['@error'] || '_error';
           }
-          // Always set _error as well as custom errorVar
           this.evaluator.state['_error'] = {
             error: err && err.message ? err.message : (err || 'Errore sconosciuto'),
             details: err && err.stack ? err.stack : undefined
@@ -1108,7 +1219,10 @@
         })
         .finally(() => {
           this.pendingFetches[fid] = false;
+          this.inflightBySignature.delete(signature);
         });
+
+      this.inflightBySignature.set(signature, fetchPromise);
 
       return fetchPromise;
     }
@@ -1126,6 +1240,7 @@
         '@wait': `Esempio: <span @when=\"condizione\" @wait=\"1000\" @go=\"pagina\"></span>`,
         '@if': `Esempio: <div @if=\"condizione\">Mostra se condizione è true</div>`,
         '@not': `Esempio: <div @not=\"condizione\">Mostra se condizione è false</div>`,
+        '@json': `Esempio: <span @json=\"'/courses/html-master.json'\" @result=\"htmlcourse\" @then=\"lessons=htmlcourse.lessons\" @finally=\"step=1\"></span> (carica file JSON locale, solo GET)`,
         '@show': `Esempio: <div @show=\"condizione\">Mostra se condizione è true</div>`,
         '@hide': `Esempio: <div @hide=\"condizione\">Nasconde se condizione è true</div>`,
         '@for': `Esempio: <li @for="item in items">{{item}}</li> o <li @for="i, item in items">{{i}}: {{item}}</li>`,
@@ -1141,6 +1256,8 @@
         '@result': `Esempio: <div @fetch="'url'" @result="data">Carica</div>`,
         '@watch': `Esempio: <div @watch="user"></div>`,
         '@text': `Esempio: <span @text="nome"></span>`,
+        '@attr': `Esempio: <img @attr="{ src: url, alt: titolo }"> (imposta attributi HTML da un oggetto). Supporta anche subdirettive come <b>@attr:src</b>, <b>@attr:alt</b>, ecc.`,
+        '@scope': `Esempio: <component @src="comp.html" @scope="course"></component> (isola la variabile 'course' per ogni istanza del componente, aggiungendo un suffisso numerico incrementale)`,
         '@date': `Esempio: <li @date="data"></li> (formatta una data ISO come "1 agosto 2025, 08:37")`,
         '@dateonly': `Esempio: <li @dateonly="data"></li> (mostra solo giorno, mese e anno)`,
         '@time': `Esempio: <li @time="data"></li> (mostra solo ora e minuti)`,
@@ -1203,7 +1320,9 @@
     }
 
     isValidDirective(name) {
-      return this.helpTexts.hasOwnProperty(name);
+      if (this.helpTexts.hasOwnProperty(name)) return true;
+      if (/^@attr:[a-zA-Z0-9_-]+$/.test(name)) return true;
+      return false;
     }
   }
 
@@ -1227,10 +1346,10 @@
         banner.style.border = '1px solid #900';
         banner.style.position = 'relative';
         banner.style.zIndex = '1000';
-        banner.innerHTML = `<b>Errore JS:</b> ${err.message}<br><code>${expr}</code>`;
+        banner.innerHTML = '<b>Errore JS:</b> ' + escapeHTML(err && err.message) + '<br><code>' + escapeHTML(expr) + '</code>';
         el.parentNode && el.parentNode.insertBefore(banner, el.nextSibling);
       } else {
-        banner.innerHTML = `<b>Errore JS:</b> ${err.message}<br><code>${expr}</code>`;
+        banner.innerHTML = '<b>Errore JS:</b> ' + escapeHTML(err && err.message) + '<br><code>' + escapeHTML(expr) + '</code>';
       }
       if (this.errorBus) {
         this.errorBus.report(err, { expr, el });
@@ -1247,7 +1366,7 @@
       errorDiv.style.borderRadius = '4px';
       errorDiv.style.fontWeight = 'bold';
       errorDiv.style.border = '1px solid #900';
-      errorDiv.innerHTML = message;
+      errorDiv.innerHTML = escapeHTML(message);
       if (this.errorBus) {
         this.errorBus.report(new Error(message), { type: 'createErrorElement', message });
       }
@@ -1264,7 +1383,7 @@
       warnDiv.style.borderRadius = '4px';
       warnDiv.style.fontWeight = 'bold';
       warnDiv.style.border = '1px solid #e0c200';
-      warnDiv.innerHTML = message;
+      warnDiv.innerHTML = escapeHTML(message);
       return warnDiv;
     }
   }
@@ -1276,7 +1395,6 @@
       this.modelBindings = [];
     }
 
-    // Utility for setting nested values (used for validation)
     static setNestedValidate(obj, path, value) {
       const keys = path.split('.');
       let current = obj;
@@ -1290,7 +1408,6 @@
     }
 
     bindModel(el, key, ctx) {
-      // ...existing code...
       let inputTypeForInit = null;
       if (el.type === 'number') {
         inputTypeForInit = 'number';
@@ -1345,10 +1462,8 @@
       const update = () => {
         const val = this.evaluator.evalExpr(key, ctx);
         if (el.type === 'checkbox') {
-          // Gestione checkbox: true/false
           el.checked = !!val;
         } else if (el.type === 'radio') {
-          // Gestione radio: checked se valore === value
           el.checked = val === el.value || val === true && el.value === 'true' || val === false && el.value === 'false';
         } else if (el.type === 'color') {
           if (val && typeof val === 'string' && val.match(/^#[0-9A-Fa-f]{6}$/)) {
@@ -1380,10 +1495,8 @@
         let value;
 
         if (el.type === 'checkbox') {
-          // Gestione checkbox: true/false
           value = el.checked;
         } else if (el.type === 'radio') {
-          // Gestione radio: "true"/"false"/string
           if (el.value === 'true') value = true;
           else if (el.value === 'false') value = false;
           else value = el.value;
@@ -1458,7 +1571,6 @@
         this.evaluator.state._validate = {};
       }
 
-      // Inizializza a null invece che false
       BindingManager.setNestedValidate(this.evaluator.state._validate, modelVar, null);
       const keys = modelVar.split('.');
       let current = this.evaluator.state._validate;
@@ -1473,7 +1585,6 @@
       }
 
       const validate = () => {
-        // Se il campo è vuoto, la validazione è null
         if (el.value === '' || el.value == null) {
           BindingManager.setNestedValidate(this.evaluator.state._validate, modelVar, null);
           el.classList.remove('invalid');
@@ -1593,8 +1704,6 @@
     }
   }
 
-
-  // Base Directive Class
   class Directive {
     constructor(evaluator, bindingManager, errorHandler) {
       this.evaluator = evaluator;
@@ -1603,11 +1712,9 @@
     }
 
     apply(vNode, ctx, state, el, completionListener = null) {
-      // To be implemented by subclasses
     }
 
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
-      // Default implementation - può essere sovrascritto
       return false;
     }
 
@@ -1624,15 +1731,51 @@
     }
   }
 
-  // All Directive Classes
+  class ScopeDirective extends Directive {
+    apply(vNode, ctx, state, el, completionListener = null) {
+      if (!vNode.directives || !vNode.directives['@scope']) {
+        if (completionListener) {
+          completionListener.addTask(() => Promise.resolve());
+        }
+        return;
+      }
 
-  // @form Directive: aggregates @model fields and computes validation status
+      const scopeVar = vNode.directives['@scope'].trim();
+
+      if (!vNode._scopeKey) {
+        const nodeIndex = vNode.parent ? vNode.parent.children.indexOf(vNode) : 0;
+        vNode._scopeKey = scopeVar + '_' + String(nodeIndex + 1).padStart(3, '0');
+      }
+
+      function replaceInDescendants(node, oldVar, newVar) {
+        if (node.scopedVars && node.scopedVars[oldVar] !== undefined) {
+          node.scopedVars[newVar] = node.scopedVars[oldVar];
+          delete node.scopedVars[oldVar];
+        }
+        if (node.children) {
+          node.children.forEach(child => replaceInDescendants(child, oldVar, newVar));
+        }
+      }
+
+      replaceInDescendants(vNode, scopeVar, vNode._scopeKey);
+
+      if (state[vNode._scopeKey] === undefined && vNode.scopedVars && vNode.scopedVars[vNode._scopeKey] !== undefined) {
+        state[vNode._scopeKey] = vNode.scopedVars[vNode._scopeKey];
+      }
+
+      delete vNode.directives['@scope'];
+
+      if (completionListener) {
+        completionListener.addTask(() => Promise.resolve());
+      }
+    }
+  }
+
   class FormDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
       const formName = vNode.directives['@form'];
       if (!formName) return;
 
-      // Recursively collect all @model fields in this form subtree
       const modelFields = [];
       const validationFields = [];
       function collectModels(node) {
@@ -1648,7 +1791,6 @@
       }
       collectModels(vNode);
 
-      // Build state[formName] object with all model values
       if (!state[formName]) state[formName] = {};
       modelFields.forEach(modelVar => {
         try {
@@ -1658,13 +1800,11 @@
         }
       });
 
-      // Compute overall validation status for the form
       if (!state._validate) state._validate = {};
       if (!state._validate[formName]) state._validate[formName] = null;
       if (validationFields.length === 0) {
         state._validate[formName] = null;
       } else {
-        // All fields must be valid (true), if any is false, form is invalid
         let allValid = true;
         for (const modelVar of validationFields) {
           if (state._validate[modelVar] === false) {
@@ -1683,7 +1823,7 @@
       }
     }
   }
-  // @date Directive: formats ISO date strings to human readable
+
   class DateDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
       let value = this.evaluator.evalExpr(vNode.directives['@date'], ctx);
@@ -1708,7 +1848,6 @@
     }
   }
 
-  // @dateonly Directive: formats ISO date strings to day/month/year
   class DateOnlyDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
       let value = this.evaluator.evalExpr(vNode.directives['@dateonly'], ctx);
@@ -1754,6 +1893,7 @@
       return date.toLocaleTimeString(navigator.language || navigator.userLanguage || 'it-IT', { hour: '2-digit', minute: '2-digit' });
     }
   }
+
   class IfDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
       const expr = vNode.directives['@if'];
@@ -1761,7 +1901,24 @@
       try {
         visible = this.evaluator.evalExpr(expr, ctx);
       } catch { }
-      if (el) el.style.display = visible ? '' : 'none';
+      
+      if (el) {
+        if (!visible) {
+          // Rimuovi l'elemento dal DOM se non visibile
+          if (el.parentNode) {
+            if (!el._ifPlaceholder) {
+              el._ifPlaceholder = document.createComment('if:' + expr);
+              el.parentNode.insertBefore(el._ifPlaceholder, el);
+            }
+            el.parentNode.removeChild(el);
+          }
+        } else {
+          // Ripristina l'elemento nel DOM se visibile
+          if (el._ifPlaceholder && el._ifPlaceholder.parentNode) {
+            el._ifPlaceholder.parentNode.insertBefore(el, el._ifPlaceholder);
+          }
+        }
+      }
 
       if (completionListener) {
         completionListener.addTask(() => Promise.resolve());
@@ -1769,7 +1926,6 @@
     }
   }
 
-  // NOT Directive: renders node only if expression is falsy
   class NotDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
       const expr = vNode.directives['@not'];
@@ -1777,11 +1933,333 @@
       try {
         visible = !this.evaluator.evalExpr(expr, ctx);
       } catch { }
-      if (el) el.style.display = visible ? '' : 'none';
+      
+      if (el) {
+        if (!visible) {
+          // Rimuovi l'elemento dal DOM se non visibile
+          if (el.parentNode) {
+            if (!el._notPlaceholder) {
+              el._notPlaceholder = document.createComment('not:' + expr);
+              el.parentNode.insertBefore(el._notPlaceholder, el);
+            }
+            el.parentNode.removeChild(el);
+          }
+        } else {
+          // Ripristina l'elemento nel DOM se visibile
+          if (el._notPlaceholder && el._notPlaceholder.parentNode) {
+            el._notPlaceholder.parentNode.insertBefore(el, el._notPlaceholder);
+          }
+        }
+      }
 
       if (completionListener) {
         completionListener.addTask(() => Promise.resolve());
       }
+    }
+  }
+
+  class JsonManager {
+    constructor(evaluator) {
+      this.evaluator = evaluator;
+      this.pendingJsons = {};
+      this.lastJsonUrl = {};
+      this.fetched = {};
+      this.readyPromise = {};
+      this.cacheByUrl = new Map();
+      this.inflightByUrl = new Map();
+      this.errorInfoByUrl = new Map();
+      this.errorCooldownMs = 3000;
+    }
+
+    setupJson(expr, rk, ctx, event, force) {
+      let url = this.evaluator.evalExpr(expr, ctx, event);
+
+      // Heuristica: funzione per rilevare URL "non popolato"
+      const isInvalidUrlString = (s) => {
+        if (s == null) return true;
+        const str = String(s).trim();
+        if (!str) return true;
+        if (/\{[^}]+\}/.test(str)) return true;               // placeholder non risolti
+        if (/(^|\/)(undefined|null)(\/|$)/i.test(str)) return true; // segmenti undefined/null
+        if (/\/\.(?:[a-z0-9]+)?(\?|$|#)/i.test(str)) return true;   // '/.json' o '/.'
+        return false;
+      };
+
+      if (url === undefined) {
+        let missingPlaceholder = false;
+        url = expr.replace(/\{([^}]+)\}/g, (_, key) => {
+          const val = this.evaluator.evalExpr(key, ctx, event);
+          if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) {
+            missingPlaceholder = true;
+            return '';
+          }
+          return String(val);
+        });
+        if (missingPlaceholder) {
+          return null;
+        }
+      }
+      if (url === undefined || url === null) {
+        url = expr;
+      }
+
+      // Se l'URL finale è "non popolato", non avviare la richiesta
+      if (isInvalidUrlString(url)) {
+        return null;
+      }
+
+      if (!url) return null;
+
+      if (/^https?:\/\//.test(url)) {
+        return Promise.reject(new Error('@json accetta solo file locali'));
+      }
+      if (!url.startsWith('/')) {
+        url = '/' + url.replace(/^\.\//, '');
+      }
+      url = location.origin + url;
+
+      const fid = `${url}::${rk}`;
+
+      if (!force && !event && this.errorInfoByUrl.has(url)) {
+        const info = this.errorInfoByUrl.get(url);
+        if (Date.now() - info.ts < this.errorCooldownMs) {
+          return null;
+        } else {
+          this.errorInfoByUrl.delete(url);
+        }
+      }
+
+      // Se lo stesso URL ha già dato errore, non ripetere automaticamente (a meno di force/event)
+      if (!force && !event && this.fetched[url]?.error) {
+        return null;
+      }
+
+      if (!force && !event && this.inflightByUrl.has(url)) {
+        const p = this.inflightByUrl.get(url);
+        this.readyPromise[fid] = p;
+        return p;
+      }
+
+      if (!force && !event && this.cacheByUrl.has(url)) {
+        const cached = this.cacheByUrl.get(url);
+        if (this.evaluator.state[rk] !== cached) {
+          this.evaluator.state[rk] = cached;
+        }
+        return Promise.resolve(cached);
+      }
+
+      if (this.pendingJsons[fid]) {
+        const existing = this.readyPromise[fid] || Promise.resolve(this.evaluator.state[rk]);
+        return existing;
+      }
+
+      if (rk && typeof rk === 'string' && rk in this.evaluator.state) {
+        this.evaluator.state[rk] = null;
+      }
+      if (this.readyPromise[fid]) delete this.readyPromise[fid];
+      this.pendingJsons[fid] = true;
+      this.lastJsonUrl[fid] = { url, value: this.evaluator.state[rk] };
+      this.pendingJsons[fid] = true;
+      this.lastJsonUrl[rk] = url;
+      if (!(rk in this.evaluator.state)) {
+        this.evaluator.state[rk] = null;
+      }
+
+      const fetchOptions = { method: 'GET' };
+      const fetchPromise = fetch(url, fetchOptions)
+        .then(res => {
+          if (!res.ok) {
+            if (!this.fetched[url]) this.fetched[url] = {};
+            this.fetched[url].error = `${res.status} ${res.statusText || 'errore di rete'}`;
+            let errorVar = '_error';
+            if (ctx && ctx._vNode && ctx._vNode.directives && ctx._vNode.directives['@error']) {
+              errorVar = ctx._vNode.directives['@error'] || '_error';
+            }
+            return res.text().then(errorBody => {
+              let parsedError;
+              try { parsedError = JSON.parse(errorBody); } catch (e) { parsedError = errorBody || `${res.status} ${res.statusText || 'errore di rete'}`; }
+              const errorObj = {
+                error: parsedError && parsedError.error ? parsedError.error : `${res.status} ${res.statusText}`,
+                details: parsedError && parsedError.details ? parsedError.details : parsedError
+              };
+              this.evaluator.state['_error'] = errorObj;
+              window._error = errorObj;
+              if (errorVar !== '_error') {
+                this.evaluator.state[errorVar] = errorObj;
+                window[errorVar] = errorObj;
+              }
+              throw new Error(`${res.status} ${res.statusText}`);
+            });
+          }
+          return res.json().catch(() => res.text());
+        })
+        .then(data => {
+          const oldVal = this.evaluator.state[rk];
+          const isEqual = JSON.stringify(oldVal) === JSON.stringify(data);
+          if (!isEqual) {
+            this.evaluator.state[rk] = data;
+          }
+          this.cacheByUrl.set(url, data);
+          this.readyPromise[fid] = Promise.resolve(data);
+          if (this.fetched[url]) delete this.fetched[url].error;
+          this.evaluator.state['_error'] = null;
+          let errorVar = '_error';
+          if (ctx && ctx._vNode && ctx._vNode.directives && ctx._vNode.directives['@error']) {
+            errorVar = ctx._vNode.directives['@error'] || '_error';
+          }
+          if (errorVar !== '_error') {
+            this.evaluator.state[errorVar] = null;
+          }
+          this.errorInfoByUrl.delete(url);
+          return data;
+        })
+        .catch(err => {
+          console.error('📄 JSON error:', { url, error: err.message, resultVariable: rk });
+          if (!this.fetched[url]) this.fetched[url] = {};
+          this.fetched[url].error = err.message;
+          let errorVar = '_error';
+          if (ctx && ctx._vNode && ctx._vNode.directives && ctx._vNode.directives['@error']) {
+            errorVar = ctx._vNode.directives['@error'] || '_error';
+          }
+
+          this.errorInfoByUrl.set(url, {
+            ts: Date.now(),
+            error: err && err.message ? err.message : String(err)
+          });
+
+          const newErrorObj = {
+            error: err && err.message ? err.message : (err || 'Errore sconosciuto'),
+            details: err && err.stack ? err.stack : undefined
+          };
+
+          const prevError = this.evaluator.state['_error'];
+          const prevStr = JSON.stringify(prevError);
+          const newStr = JSON.stringify(newErrorObj);
+          if (prevStr !== newStr) {
+            this.evaluator.state['_error'] = newErrorObj;
+          }
+          if (errorVar !== '_error') {
+            this.evaluator.state[errorVar] = this.evaluator.state['_error'];
+          }
+
+          console.error('@json error:', err);
+
+          return null;
+        })
+        .finally(() => {
+          this.pendingJsons[fid] = false;
+          this.inflightByUrl.delete(url);
+        });
+
+      this.inflightByUrl.set(url, fetchPromise);
+      return fetchPromise;
+    }
+  }
+
+  class JsonDirective extends Directive {
+    constructor(evaluator, bindingManager, errorHandler, jsonManager) {
+      super(evaluator, bindingManager, errorHandler);
+      this.jsonManager = jsonManager;
+    }
+
+    apply(vNode, ctx, state, el, completionListener = null) {
+      const expr = vNode.directives['@json'];
+      if (!expr) return;
+      if (vNode.subDirectives?.['@json'] || vNode.directives['@when']) {
+        return;
+      }
+      const autoExpr = this.evaluator.autoVarExpr(expr);
+      const resultVar = vNode.directives['@result'] || 'result';
+      const ctxWithVNode = Object.assign({}, ctx, { _vNode: vNode });
+
+      // Controllare se è cache hit prima di chiamare setupJson
+      let url = this.evaluator.evalExpr(autoExpr, ctxWithVNode);
+      if (url === undefined) {
+        url = autoExpr;
+      }
+      if (typeof url === 'string') {
+        url = url.trim();
+        const first = url[0], last = url[url.length - 1];
+        if (first && first === last && (first === '`' || first === '"' || first === "'")) {
+          url = url.slice(1, -1).trim();
+        }
+      }
+      if (!/^https?:\/\//.test(url)) {
+        if (!url.startsWith('/')) {
+          url = '/' + url.replace(/^\.\//, '');
+        }
+        url = location.origin + url;
+      }
+
+      const isCached = this.jsonManager.cacheByUrl.has(url);
+      const jsonPromise = this.jsonManager.setupJson(autoExpr, resultVar, ctxWithVNode);
+
+      if (completionListener && jsonPromise && typeof jsonPromise.then === 'function' && !isCached) {
+        completionListener.addTask(
+          jsonPromise.then(data => {
+            ctxWithVNode._eventResult = data;
+            return data;
+          })
+        );
+      }
+
+      if (vNode.directives['@watch']) {
+        this.handleWatchDirective(vNode, autoExpr, resultVar);
+      }
+    }
+
+    handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
+      const eventName = event === 'hover' ? 'mouseover' : event;
+      const done = completionListener ? completionListener.addAsyncTask() : null;
+      el.addEventListener(eventName, (e) => {
+        const resultVar = vNode.directives['@result'] || 'result';
+        const ctxWithVNode = Object.assign({}, ctx, { _vNode: vNode });
+        try {
+          let url = this.evaluator.evalExpr(expression, ctxWithVNode);
+          if (url === undefined) {
+            url = expression;
+          }
+          const jsonPromise = this.jsonManager.setupJson(url, resultVar, ctxWithVNode, e, true);
+          if (jsonPromise && typeof jsonPromise.then === 'function') {
+            jsonPromise.then(data => {
+              ctxWithVNode._eventResult = data;
+            }).finally(() => { if (done) done(); });
+          } else if (done) {
+            done();
+          }
+        } catch (err) {
+          this.showError(el, err, expression);
+          if (done) done();
+        }
+      });
+      return true;
+    }
+
+    handleWatchDirective(vNode, expr, resultVar) {
+      vNode.directives['@watch'].split(',').forEach(watchExpr => {
+        watchExpr = watchExpr.trim();
+        const match = watchExpr.match(/^([\w$]+)\s*=>\s*(.+)$/) ||
+          watchExpr.match(/^([\w$]+)\s*:\s*(.+)$/);
+        if (match) {
+          const prop = match[1];
+          const code = match[2];
+          this.evaluator.ensureVarInState(code);
+          window.ayisha.addWatcher(prop, (newVal) => {
+            try {
+              this.executeExpression(code, {}, { newVal }, true);
+            } catch (e) {
+              console.error('Watcher error:', e);
+            }
+          }, { oneShot: true });
+        } else {
+          window.ayisha.addWatcher(watchExpr, () => {
+            const jsonPromise = this.jsonManager.setupJson(expr, resultVar, undefined, undefined, true);
+            if (jsonPromise && typeof jsonPromise.then === 'function') {
+              jsonPromise.catch(() => { });
+            }
+          }, { oneShot: true });
+        }
+      });
     }
   }
 
@@ -1886,7 +2364,7 @@
       return false;
     }
   }
-  // Utility class for nested object/array path operations
+
   class AyishaNestedUtil {
     static setNested(obj, path, value) {
       const keys = path.split('.');
@@ -1995,6 +2473,7 @@
     }
     handleSubDirective() { return false; }
   }
+
   class ShowDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
       const expr = vNode.directives['@show'];
@@ -2009,6 +2488,7 @@
       }
     }
   }
+
   class HideDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
       const expr = vNode.directives['@hide'];
@@ -2055,9 +2535,7 @@
     }
 
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
-      // CRITICAL: Save original text BEFORE any modifications
       if (!el._ayishaOriginalText) {
-        // Get the text content from the original vNode children if available
         if (vNode.children && vNode.children.length > 0) {
           el._ayishaOriginalText = vNode.children
             .filter(child => child.type === 'text')
@@ -2104,6 +2582,7 @@
       }
     }
   }
+
   class ClassDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
       const expr = vNode.directives['@class'];
@@ -2111,23 +2590,28 @@
 
       let clsMap = {};
       try {
+        const raw = typeof expr === 'string' ? expr.trim() : expr;
         let result = this.evalExpr(expr, ctx);
+
+        // Support object literal passed as a plain string (e.g. {'open': mobileNavOpen})
+        if ((result === undefined || result === null) && typeof raw === 'string' && raw.startsWith('{') && raw.endsWith('}')) {
+          try {
+            result = this.evaluator.evalExpr(`(${raw})`, ctx);
+          } catch { }
+        }
+
         if (typeof result === 'string') {
           let str = result.trim();
-          // Remove outer quotes if present
           if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
             str = str.slice(1, -1);
           }
-          // If looks like an object: {key:val,...}
           if (str.startsWith('{') && str.endsWith('}')) {
             str = str.slice(1, -1);
-            // Split by comma, handle quoted and unquoted keys
             str.split(',').forEach(pair => {
               let [key, val] = pair.split(':');
               if (key && val !== undefined) {
                 key = key.trim().replace(/^['"]|['"]$/g, '');
                 try {
-                  // Try to eval val as JS
                   val = this.evaluator.evalExpr(val.trim(), ctx);
                 } catch {
                   val = !!val.trim();
@@ -2136,7 +2620,6 @@
               }
             });
           } else {
-            // fallback: treat as single class name
             clsMap = { [str]: true };
           }
         } else if (typeof result === 'object' && result !== null) {
@@ -2153,7 +2636,6 @@
       Object.entries(clsMap).forEach(([cls, cond]) => {
         el.classList.toggle(cls, !!cond);
       });
-      // Force update of class attribute
       el.setAttribute('class', el.className);
 
       if (completionListener) {
@@ -2265,7 +2747,6 @@
       const expr = vNode.directives['@click'];
       if (!expr) return;
 
-      // Only ensure simple variable names, not complex expressions
       if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
         !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
         !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
@@ -2298,15 +2779,30 @@
           return;
         }
 
+        // Handle simple toggle pattern: foo = !foo
+        const toggleMatch = processedCode.match(/^\s*([a-zA-Z_$][\w$]*)\s*=\s*!\s*\1\s*$/);
+        if (toggleMatch) {
+          const varName = toggleMatch[1];
+          const cur = state[varName];
+          state[varName] = !Boolean(cur);
+          if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
+            clearTimeout(window.ayisha?._componentRenderTimeout);
+            window.ayisha._componentRenderQueued = true;
+            window.ayisha._componentRenderTimeout = setTimeout(() => {
+              window.ayisha._componentRenderQueued = false;
+              window.ayisha.render();
+            }, 0);
+          }
+          return;
+        }
+
         this.executeExpression(processedCode, ctx, e);
 
-        // Ensure all assignments update the global state
         const ayishaAssignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*([^;,]+)/g;
         let ayishaMatch;
         while ((ayishaMatch = ayishaAssignmentRegex.exec(processedCode)) !== null) {
           const varName = ayishaMatch[1].trim();
           let value;
-          // Prefer value from local context if available
           if (ctx[varName] !== undefined) {
             value = ctx[varName];
           } else {
@@ -2318,18 +2814,29 @@
           }
           state[varName] = value;
         }
-        setTimeout(() => window.ayisha && window.ayisha.render(), 0);
+        if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
+          clearTimeout(window.ayisha?._componentRenderTimeout);
+          window.ayisha._componentRenderQueued = true;
+          window.ayisha._componentRenderTimeout = setTimeout(() => {
+            window.ayisha._componentRenderQueued = false;
+            window.ayisha.render();
+          }, 0);
+        }
 
-        // Patch: propagate assignments to global state if needed
-        // Find assignments in the expression (e.g. foo=bar, page=index+1)
         const assignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*([^;]+)/g;
         let match;
         while ((match = assignmentRegex.exec(processedCode)) !== null) {
           const varName = match[1].trim();
-          // Only propagate if the variable exists in global state and differs
           if (varName in state && ctx[varName] !== undefined && ctx[varName] !== state[varName]) {
             state[varName] = ctx[varName];
-            setTimeout(() => window.ayisha && window.ayisha.render(), 0);
+            if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
+              clearTimeout(window.ayisha?._componentRenderTimeout);
+              window.ayisha._componentRenderQueued = true;
+              window.ayisha._componentRenderTimeout = setTimeout(() => {
+                window.ayisha._componentRenderQueued = false;
+                window.ayisha.render();
+              }, 0);
+            }
           }
         }
 
@@ -2498,16 +3005,19 @@
       const ctxWithVNode = Object.assign({}, ctx, { _vNode: vNode });
 
       const fetchPromise = this.fetchManager.setupFetch(autoExpr, resultVar, ctxWithVNode);
+
+      // SOLO aggiungere task se fetchPromise è una Promise valida
       if (completionListener && fetchPromise && typeof fetchPromise.then === 'function') {
-        // Wrap the fetchPromise to also store the result in ctx._eventResult for @then
         completionListener.addTask(
           fetchPromise.then(data => {
-            console.log('Fetch result:', data);
             ctxWithVNode._eventResult = data;
             return data;
           })
         );
       }
+      // Se fetchPromise è null (cache hit, errore, URL invalido), NON aggiungere task
+
+      // Removed direct handling of @then/@finally here
 
       if (vNode.directives['@watch']) {
         this.handleWatchDirective(vNode, autoExpr, resultVar);
@@ -2708,7 +3218,6 @@
           }
         }
 
-        // Se undefined/null, mostra un valore di default generico
         if (stateValue === undefined) stateValue = null;
 
         function removeCircular(obj) {
@@ -2780,6 +3289,27 @@
         completionListener.addTask(() => Promise.resolve());
       }
     }
+
+    handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
+      const attrName = event;
+      try {
+        const value = this.evalExpr(expression, ctx);
+        if (el) {
+          if (value == null) {
+            el.removeAttribute(attrName);
+          } else {
+            el.setAttribute(attrName, value);
+          }
+        }
+      } catch (err) {
+        this.showError(el, err, expression);
+      }
+
+      if (completionListener) {
+        completionListener.addTask(() => Promise.resolve());
+      }
+      return true;
+    }
   }
 
   class FocusDirective extends Directive {
@@ -2787,7 +3317,6 @@
       const expr = vNode.directives['@focus'];
       if (!expr) return;
 
-      // Only ensure simple variable names, not complex expressions
       if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
         !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
         !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
@@ -2810,7 +3339,6 @@
 
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'focus') {
-        // Only ensure simple variable names, not complex expressions
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expression.trim()) &&
           !expression.includes('=') && !expression.includes('<') && !expression.includes('>') &&
           !expression.includes('!') && !expression.includes('&') && !expression.includes('|') &&
@@ -2838,7 +3366,6 @@
       const expr = vNode.directives['@blur'];
       if (!expr) return;
 
-      // Only ensure simple variable names, not complex expressions
       if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
         !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
         !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
@@ -2861,7 +3388,6 @@
 
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'blur') {
-        // Only ensure simple variable names, not complex expressions
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expression.trim()) &&
           !expression.includes('=') && !expression.includes('<') && !expression.includes('>') &&
           !expression.includes('!') && !expression.includes('&') && !expression.includes('|') &&
@@ -2889,7 +3415,6 @@
       const expr = vNode.directives['@change'];
       if (!expr) return;
 
-      // Only ensure simple variable names, not complex expressions
       if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
         !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
         !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
@@ -2912,7 +3437,6 @@
 
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'change') {
-        // Only ensure simple variable names, not complex expressions
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expression.trim()) &&
           !expression.includes('=') && !expression.includes('<') && !expression.includes('>') &&
           !expression.includes('!') && !expression.includes('&') && !expression.includes('|') &&
@@ -2940,7 +3464,6 @@
       const expr = vNode.directives['@input'];
       if (!expr) return;
 
-      // Only ensure simple variable names, not complex expressions
       if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
         !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
         !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
@@ -2963,7 +3486,6 @@
 
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'input') {
-        // Only ensure simple variable names, not complex expressions
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expression.trim()) &&
           !expression.includes('=') && !expression.includes('<') && !expression.includes('>') &&
           !expression.includes('!') && !expression.includes('&') && !expression.includes('|') &&
@@ -2988,12 +3510,9 @@
 
   class DoDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
-      // PATCH: esegui @do solo se NON c'è @watch, @when, @fetch, @click, @input, @change, @blur, @focus, @hover, @go, @set, @model, @validate, @key, @result, @then, @finally, @error, @payload, @headers, @method, @page, @component, @src, @state, @log, @text, @class, @style, @show, @hide, @if, @for, @switch, @case, @default, @source, @map, @filter, @reduce, @initial, @animate, @link, @key, @set, @model, @validate, @key, @result, @then, @finally, @error, @payload, @headers, @method, @page, @component, @src, @state, @log, @text, @class, @style, @show, @hide, @if, @for, @switch, @case, @default, @source, @map, @filter, @reduce, @initial, @animate, @link, @key, @set, @model, @validate, @key, @result, @then, @finally, @error, @payload, @headers, @method, @page, @component, @src, @state, @log, @text, @class, @style, @show, @hide, @if, @for, @switch, @case, @default, @source, @map, @filter, @reduce, @initial, @animate, @link
-      // (in pratica: SOLO se @do è l'unica direttiva, o se usata con @when)
       const expr = vNode.directives['@do'];
       if (!expr) return;
 
-      // Se c'è una direttiva triggerante, NON eseguire qui (sarà il watcher/evento a triggerare)
       const triggerDirectives = [
         '@watch', '@when', '@fetch', '@click', '@input', '@change', '@blur', '@focus', '@hover', '@go', '@set', '@model', '@validate', '@key', '@result', '@then', '@finally', '@error', '@payload', '@headers', '@method', '@page', '@component', '@src', '@state', '@log', '@text', '@class', '@style', '@show', '@hide', '@if', '@for', '@switch', '@case', '@default', '@source', '@map', '@filter', '@reduce', '@initial', '@animate', '@link'
       ];
@@ -3001,7 +3520,6 @@
         if (vNode.directives[dir] && dir !== '@do') return;
       }
 
-      // Se siamo qui, @do è "standalone" (o solo con @when)
       this.executeExpression(expr, ctx);
       if (completionListener) {
         completionListener.addTask(() => Promise.resolve());
@@ -3024,10 +3542,8 @@
       const directiveKey = `when_${whenExpr}_${doExpr || ''}_${goExpr || ''}`;
       if (!window._ayishaWhenLastState) window._ayishaWhenLastState = {};
 
-      // Setup watcher only once per vNode
       if (!vNode._ayishaWhenWatcherSetup) {
         vNode._ayishaWhenWatcherSetup = true;
-        // Estrarre tutte le dipendenze (variabili) usate nell'espressione @when
         const deps = this.evaluator.extractDependencies(whenExpr);
         if (window.ayisha && typeof window.ayisha.addWatcher === 'function') {
           deps.forEach(dep => {
@@ -3052,7 +3568,6 @@
       const isTrue = !!condition;
       let wasTrue = window._ayishaWhenLastState[directiveKey];
       if (typeof wasTrue !== 'boolean') wasTrue = false;
-      // PATCH: trigger @do/@go solo su rising edge (da false a true), MAI su ogni render o su update di variabili non rilevanti
       if (isTrue && !wasTrue) {
         let executed = false;
         const executeNow = () => {
@@ -3071,7 +3586,6 @@
                 page = goExpr.trim().replace(/^['"]|['"]$/g, '');
               }
               if (typeof page === 'string' && page.length > 0) {
-                // Solo se cambia davvero la pagina
                 if (state._currentPage !== page) {
                   state._currentPage = page;
                   if (window && window.history && typeof window.history.pushState === 'function') {
@@ -3121,6 +3635,12 @@
           }
         } else {
           executeNow();
+          // Notifica il completionListener per esecuzione immediata
+          if (completionListener) {
+            setTimeout(() => {
+              completionListener.markSyncDone();
+            }, 0);
+          }
         }
       } else if (!isTrue && wasTrue) {
         window._ayishaWhenLastState[directiveKey] = false;
@@ -3151,7 +3671,6 @@
       let page = this.evaluator ? this.evaluator.evalExpr(expr, ctx) : expr;
 
       if (typeof page === 'string') {
-        // Gestisci i percorsi relativi e assoluti
         let finalPage = this.resolvePath(page);
 
         state._currentPage = finalPage;
@@ -3163,7 +3682,14 @@
         }
 
         if (typeof window.ayisha?.render === 'function') {
-          setTimeout(() => window.ayisha.render(), 0);
+          if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
+            clearTimeout(window.ayisha?._componentRenderTimeout);
+            window.ayisha._componentRenderQueued = true;
+            window.ayisha._componentRenderTimeout = setTimeout(() => {
+              window.ayisha._componentRenderQueued = false;
+              window.ayisha.render();
+            }, 0);
+          }
         }
       }
 
@@ -3175,19 +3701,16 @@
     resolvePath(targetPage) {
       if (!targetPage) return '';
 
-      // Se il percorso inizia con '/', è un percorso assoluto
       if (targetPage.startsWith('/')) {
-        return targetPage.substring(1); // Rimuovi il '/' iniziale
+        return targetPage.substring(1);
       }
 
-      // Se il percorso è relativo, sostituisce completamente il percorso corrente
       return targetPage;
     }
   }
 
   class WaitDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
-      // handled reactively in AyishaVDOM, no-op for SEO
       if (completionListener) {
         completionListener.addTask(() => Promise.resolve());
       }
@@ -3252,20 +3775,30 @@
 
   class ThenDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
-      // @then is handled by the completion listener system
-      // This directive just marks that completion tracking is needed
-      if (completionListener) {
-        completionListener.addTask(() => Promise.resolve());
+      const expr = vNode.directives['@then'];
+      if (completionListener && expr) {
+        completionListener.addThen(() => {
+          try {
+            this.evaluator.executeDirectiveExpression(expr, ctx, state, el);
+          } catch (err) {
+            this.showError(el, err, expr);
+          }
+        });
       }
     }
   }
 
   class FinallyDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
-      // @finally is handled by the completion listener system
-      // This directive just marks that completion tracking is needed
-      if (completionListener) {
-        completionListener.addTask(() => Promise.resolve());
+      const expr = vNode.directives['@finally'];
+      if (completionListener && expr) {
+        completionListener.addFinally(() => {
+          try {
+            this.evaluator.executeDirectiveExpression(expr, ctx, state, el);
+          } catch (err) {
+            this.showError(el, err, expr);
+          }
+        });
       }
     }
   }
@@ -3311,8 +3844,17 @@
   }
 
   class ComponentDirective extends Directive {
+    constructor(evaluator, bindingManager, errorHandler, componentManager) {
+      super(evaluator, bindingManager, errorHandler);
+      this.componentManager = componentManager;
+      this._scopeCounter = 0;
+      this._scopeMap = new WeakMap();
+      this._instanceIdMap = new WeakMap();
+    }
+    static _scopeCounter = 1;
+    static _scopeMap = new WeakMap();
+    static _elementInstanceMap = new WeakMap();
     apply(vNode, ctx, state, el, completionListener = null) {
-      // Modular VDOM component loading (for <component @src="...">)
       const src = vNode.directives['@src'];
       if (!src) {
         return this.errorHandler.createErrorElement(`Error: <b>&lt;component&gt;</b> requires the <b>@src</b> attribute`);
@@ -3324,10 +3866,8 @@
       } catch (e) {
         srcUrl = src;
       }
-      // Fallback to raw attribute if still falsy
       if (!srcUrl) srcUrl = src;
       if (typeof srcUrl === 'string') srcUrl = srcUrl.trim();
-      // Normalize quotes (single or double)
       if (typeof srcUrl === 'string' && /^['"].*['"]$/.test(srcUrl)) {
         srcUrl = srcUrl.slice(1, -1);
       }
@@ -3336,20 +3876,81 @@
       }
       if (srcUrl.startsWith('./')) srcUrl = srcUrl.substring(2);
 
+      const mapKey = el || vNode;
+
+      let instanceId = ComponentDirective._elementInstanceMap.get(mapKey);
+      if (!instanceId) {
+        instanceId = ComponentDirective._scopeCounter++;
+        ComponentDirective._elementInstanceMap.set(mapKey, instanceId);
+      }
+
+      if (vNode.directives['@scope']) {
+        const scopeVars = String(vNode.directives['@scope'])
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        let scopeEntry = ComponentDirective._scopeMap.get(mapKey);
+        if (!scopeEntry) {
+          scopeEntry = { scopedNames: {}, htmlPatched: false };
+          ComponentDirective._scopeMap.set(mapKey, scopeEntry);
+        }
+
+        vNode._scopedNames = vNode._scopedNames || {};
+        scopeVars.forEach((varName) => {
+          if (!scopeEntry.scopedNames[varName]) {
+            const scopedName = `${varName}_${String(instanceId).padStart(4, '0')}`;
+            scopeEntry.scopedNames[varName] = scopedName;
+
+            if (vNode.scopedVars && vNode.scopedVars[varName] !== undefined) {
+              vNode.scopedVars[scopedName] = vNode.scopedVars[varName];
+            }
+            if (state[varName] !== undefined && state[scopedName] === undefined) {
+              state[scopedName] = state[varName];
+            }
+          }
+          vNode._scopedNames[varName] = scopeEntry.scopedNames[varName];
+        });
+      }
+
       const cm = window.ayisha?.componentManager;
       if (cm && cm.getCachedComponent(srcUrl)) {
-        const componentHtml = cm.getCachedComponent(srcUrl);
+        let componentHtml = cm.getCachedComponent(srcUrl);
+
+        if (vNode._scopedNames && !ComponentDirective._scopeMap.get(mapKey)?.htmlPatched) {
+          Object.entries(vNode._scopedNames).forEach(([varName, scopedName]) => {
+            const resultRegex = new RegExp(`@result=["']${varName}(?!_\\d+)["']`, 'g');
+            const bindingRegex = new RegExp(`\\b${varName}(?!_\\d+)\\.`, 'g');
+            componentHtml = componentHtml.replace(resultRegex, `@result="${scopedName}"`);
+            componentHtml = componentHtml.replace(bindingRegex, `${scopedName}.`);
+          });
+          const entry = ComponentDirective._scopeMap.get(mapKey);
+          if (entry) entry.htmlPatched = true;
+        }
+
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = componentHtml;
         window.ayisha?._processComponentInitBlocks(tempDiv);
         const componentVNode = window.ayisha?.parse(tempDiv);
         if (componentVNode && componentVNode.children) {
+          let componentCtx;
+          if (vNode.scopedVars && typeof vNode.scopedVars === 'object') {
+            componentCtx = Object.create(ctx || null);
+            for (const [k, v] of Object.entries(vNode.scopedVars)) {
+              let val = v;
+              try {
+                val = window.ayisha.evaluator.evalExpr(v, ctx);
+              } catch { }
+              componentCtx[k] = val;
+            }
+          } else {
+            componentCtx = Object.create(null);
+          }
           const frag = document.createDocumentFragment();
           componentVNode.children.forEach(child => {
-            const node = state._ayishaInstance._renderVNode(child, ctx);
+            const node = state._ayishaInstance._renderVNode(child, componentCtx);
             if (node) frag.appendChild(node);
           });
-
           if (completionListener) {
             completionListener.addTask(() => Promise.resolve());
           }
@@ -3360,22 +3961,44 @@
       if (cm && !cm.getCachedComponent(srcUrl)) {
         const loadPromise = cm.loadExternalComponent(srcUrl).then(html => {
           if (html) {
+            let patchedHtml = html;
+
+            if (vNode._scopedNames && !ComponentDirective._scopeMap.get(mapKey)?.htmlPatched) {
+              Object.entries(vNode._scopedNames).forEach(([varName, scopedName]) => {
+                const resultRegex = new RegExp(`@result=["']${varName}(?!_\\d+)["']`, 'g');
+                const bindingRegex = new RegExp(`\\b${varName}(?!_\\d+)\\.`, 'g');
+
+                patchedHtml = patchedHtml.replace(resultRegex, `@result="${scopedName}"`);
+                patchedHtml = patchedHtml.replace(bindingRegex, `${scopedName}.`);
+              });
+              const entry = ComponentDirective._scopeMap.get(mapKey);
+              if (entry) entry.htmlPatched = true;
+            }
+
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
+            tempDiv.innerHTML = patchedHtml;
             window.ayisha?._processComponentInitBlocks(tempDiv);
-            if (!window.ayisha?._isRendering) {
+            if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
               clearTimeout(window.ayisha?._componentRenderTimeout);
-              window.ayisha._componentRenderTimeout = setTimeout(() => window.ayisha.render(), 10);
+              window.ayisha._componentRenderQueued = true;
+              window.ayisha._componentRenderTimeout = setTimeout(() => {
+                window.ayisha._componentRenderQueued = false;
+                window.ayisha.render();
+              }, 10);
             }
           } else {
             console.error(`ComponentManager: Failed to load component ${srcUrl}`);
           }
         }).catch(err => {
           console.error('Error loading component:', err);
-          cm.cache[srcUrl] = `<div class='component-error' style='padding: 10px; background: #ffe6e6; border: 1px solid #ff6b6b; border-radius: 4px; color: #d32f2f;'>Errore: ${err.message}</div>`;
-          if (!window.ayisha?._isRendering) {
+          cm.cache[srcUrl] = "<div class='component-error' style='padding: 10px; background: #ffe6e6; border: 1px solid #ff6b6b; border-radius: 4px; color: #d32f2f;'>Errore: " + escapeHTML(err && err.message) + "</div>";
+          if (!window.ayisha?._isRendering && !window.ayisha?._componentRenderQueued) {
             clearTimeout(window.ayisha?._componentRenderTimeout);
-            window.ayisha._componentRenderTimeout = setTimeout(() => window.ayisha.render(), 10);
+            window.ayisha._componentRenderQueued = true;
+            window.ayisha._componentRenderTimeout = setTimeout(() => {
+              window.ayisha._componentRenderQueued = false;
+              window.ayisha.render();
+            }, 10);
           }
         });
 
@@ -3387,14 +4010,13 @@
       const placeholder = document.createElement('div');
       placeholder.className = 'component-loading';
       placeholder.style.cssText = 'padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; color: #6c757d; font-size: 14px; text-align: center;';
-      placeholder.innerHTML = `⏳ Loading component: <code>${srcUrl}</code>`;
+      placeholder.innerHTML = '⏳ Loading component: <code>' + escapeHTML(srcUrl) + '</code>';
       return placeholder;
     }
   }
 
   class SwitchDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
-      // VDOM switch logic
       const swVal = this.evaluator.evalExpr(vNode.directives['@switch'], ctx);
       let defaultNode = null;
       for (const child of vNode.children) {
@@ -3421,7 +4043,6 @@
 
   class CaseDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
-      // CaseDirective: gestito dal parent SwitchDirective
       if (completionListener) {
         completionListener.addTask(() => Promise.resolve());
       }
@@ -3430,7 +4051,6 @@
 
   class DefaultDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
-      // DefaultDirective: gestito dal parent SwitchDirective
       if (completionListener) {
         completionListener.addTask(() => Promise.resolve());
       }
@@ -3511,7 +4131,6 @@
 
   class InitialDirective extends Directive {
     apply(vNode, ctx, state, el, completionListener = null) {
-      // InitialDirective: usato da ReduceDirective
       if (completionListener) {
         completionListener.addTask(() => Promise.resolve());
       }
@@ -3536,26 +4155,60 @@
         const done = completionListener ? completionListener.addAsyncTask() : null;
         el.addEventListener('click', e => {
           e.preventDefault();
-          const targetPage = vNode.directives['@link'];
+          const raw = vNode.directives['@link'];
+          let targetPage = raw;
+
+          try {
+            if (this.evaluator && typeof raw === 'string') {
+              const evaluated = this.evaluator.evalAttrValue(raw, ctx);
+
+              if (evaluated !== raw) {
+                targetPage = evaluated;
+              } else {
+                const t = raw.trim();
+
+                const looksLikeLiteralRoute =
+                  /^[a-zA-Z0-9_\/\.-]+$/.test(t) &&
+                  !t.startsWith("'") && !t.startsWith('"') &&
+                  !t.includes('{') && !t.includes('}') &&
+                  !t.includes(' ');
+
+                if (looksLikeLiteralRoute) {
+                  targetPage = t;
+                } else {
+                  const exprVal = this.evaluator.evalExpr(raw, ctx);
+                  targetPage = (exprVal != null && exprVal !== undefined) ? exprVal : evaluated;
+                }
+              }
+            }
+          } catch { }
+
+          if (targetPage && typeof targetPage === 'object') {
+            targetPage = Array.isArray(targetPage) ? targetPage.join('/') : (typeof raw === 'string' ? raw.trim() : '');
+          } else if (typeof targetPage !== 'string') {
+            targetPage = String(targetPage ?? '').trim();
+          }
 
           let finalPage = this.resolvePath(targetPage);
+          if (!finalPage || finalPage === '[object Object]') {
+            finalPage = (typeof raw === 'string') ? this.resolvePath(raw.trim()) : '';
+          }
 
-          state._currentPage = finalPage;
+          const segments = finalPage.split('/').filter(Boolean);
+          state._currentPage = segments[0] || '';
+          state._params = segments.slice(1);
+          const url = '/' + segments.join('/');
 
           if (window && window.history && typeof window.history.pushState === 'function') {
-            const url = finalPage ? '/' + finalPage : '/';
             window.history.pushState({}, '', url);
             window.dispatchEvent(new PopStateEvent('popstate'));
           }
-
           setTimeout(() => {
             window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-          }, 10);
-
+          }, 100);
           if (typeof window.ayisha?.render === 'function') {
             setTimeout(() => window.ayisha.render(), 0);
           }
-
           if (done) done();
         });
       }
@@ -3614,7 +4267,6 @@
     }
   }
 
-  // Modular Directives Object
   const ModularDirectives = {
     '@if': IfDirective,
     '@not': NotDirective,
@@ -3663,10 +4315,10 @@
     '@hover': HoverDirective,
     '@date': DateDirective,
     '@dateonly': DateOnlyDirective,
-    '@time': TimeDirective
+    '@time': TimeDirective,
+    '@scope': ScopeDirective
   };
 
-  // Enhanced Directive Manager
   class DirectiveManager {
     constructor(evaluator, bindingManager, errorHandler, fetchManager) {
       this.directives = new Map();
@@ -3674,6 +4326,7 @@
       this.bindingManager = bindingManager;
       this.errorHandler = errorHandler;
       this.fetchManager = fetchManager;
+      this.jsonManager = new JsonManager(this.evaluator);
 
       this.initializeDirectives();
     }
@@ -3695,6 +4348,7 @@
       this.register('@style', new StyleDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@click', new ClickDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@fetch', new FetchDirective(this.evaluator, this.bindingManager, this.errorHandler, this.fetchManager));
+      this.register('@json', new JsonDirective(this.evaluator, this.bindingManager, this.errorHandler, this.jsonManager));
       this.register('@validate', new ValidateDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@state', new StateDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@log', new LogDirective(this.evaluator, this.bindingManager, this.errorHandler));
@@ -3726,6 +4380,7 @@
       this.register('@prev', new PrevDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@link', new LinkDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@hover', new HoverDirective(this.evaluator, this.bindingManager, this.errorHandler));
+      this.register('@scope', new ScopeDirective(this.evaluator, this.bindingManager, this.errorHandler));
     }
 
     register(name, directive) {
@@ -3763,7 +4418,6 @@
         ancestry = ancestry.reverse();
         uniqueId = ancestry.join('>') + '::' + vNode.directives['@watch'] + '::' + vNode.directives['@do'];
 
-        vNode.directives['@__autoKey'] = uniqueId;
         vNode.directives['@watch'].split(',').forEach(watchExpr => {
           const prop = watchExpr.trim();
           const regKey = prop + '::' + vNode.directives['@do'] + '::' + uniqueId;
@@ -3793,7 +4447,6 @@
         }
       });
 
-      // Apply sub-directives
       Object.entries(vNode.subDirectives || {}).forEach(([directiveName, events]) => {
         const directive = this.getDirective(directiveName);
         if (directive) {
@@ -4490,9 +5143,85 @@
     }
   }
 
-  // === MAIN AYISHA VDOM CLASS ===
-
   class AyishaVDOM {
+
+    _rehydrateVDOM(vNode) {
+      if (!vNode || typeof vNode !== 'object') return;
+      // Ricostruisci riferimenti alle classi direttive/componenti
+      if (vNode.directives) {
+        for (const dir in vNode.directives) {
+          if (ModularDirectives[dir]) {
+            vNode.directives[dir] = vNode.directives[dir]; // placeholder, qui puoi aggiungere logica custom se serve
+          }
+        }
+      }
+      if (vNode.children && Array.isArray(vNode.children)) {
+        vNode.children.forEach(child => this._rehydrateVDOM(child));
+      }
+      if (vNode.subDirectives) {
+        for (const sub in vNode.subDirectives) {
+          if (typeof vNode.subDirectives[sub] === 'object') {
+            Object.values(vNode.subDirectives[sub]).forEach(expr => {
+              // placeholder per eventuale logica custom
+            });
+          }
+        }
+      }
+    }
+
+    hydrateFromVDOM(vdom) {
+      this._vdom = vdom;
+      this._rehydrateVDOM(this._vdom);
+      if (!this.state._currentPage) {
+        const firstPage = this._findFirstPageDirective(this._vdom);
+        if (firstPage) this.state._currentPage = firstPage.directives['@page'];
+      }
+      this._preInitializeEssentialVariables();
+      this._makeReactive();
+      this._runInitBlocks();
+      this.reactivitySystem.enableWatchers();
+      this._setupRouting();
+      this.router.setupCurrentPageProperty();
+      this.preloadComponents().then(() => {
+        if (!this._isRendering) {
+          this.render();
+        }
+      });
+      this.render();
+      this.root.addEventListener('click', e => {
+        let el = e.target;
+        while (el && el !== this.root) {
+          if (el.hasAttribute('@link')) {
+            e.preventDefault();
+            const targetPage = el.getAttribute('@link');
+            let finalPage = targetPage;
+            if (targetPage.startsWith('/')) {
+              finalPage = targetPage.substring(1);
+            }
+            this.state._currentPage = finalPage;
+            this.render();
+            return;
+          }
+          if (el.tagName === 'A' && el.hasAttribute('href')) {
+            const href = el.getAttribute('href');
+            if (href && (href === 'index.html' || href === './index.html' || href === '/index.html')) {
+              e.preventDefault();
+              window.location.href = '/index.html';
+              return;
+            }
+            if (href && !/^(https?:|ftp:|mailto:|tel:|#|javascript:)/i.test(href)) {
+              e.preventDefault();
+              window.location.href = '/' + href.replace(/^\/+/, '');
+              return;
+            }
+            return;
+          }
+          el = el.parentNode;
+        }
+      }, true);
+    }
+
+
     showAllErrors(container = document.body) {
       if (!this.errorBus) return;
       const old = container.querySelector('.ayisha-error-list');
@@ -4513,17 +5242,13 @@
       max-width: 600px;
       box-shadow: 0 2px 8px rgba(200,0,0,0.08);
     `;
-      wrapper.innerHTML = `<div style='font-weight:bold; color:#900; margin-bottom:8px;'>❌ Ayisha Error Log (${errors.length})</div>`;
+      wrapper.innerHTML = '<div style=\'font-weight:bold; color:#900; margin-bottom:8px;\'>❌ Ayisha Error Log (' + String(errors.length) + ')</div>';
       errors.forEach((err, i) => {
         const div = document.createElement('div');
         div.style.cssText = `margin-bottom:10px; padding:8px; border-bottom:1px solid #fdd;`;
-        div.innerHTML = `
-        <div style='font-weight:bold;'>${i + 1}. ${err.error?.message || err.error || 'Unknown error'}</div>
-        <div style='color:#333; font-size:12px;'>${err.context && err.context.expr ? `<b>Expr:</b> <code>${err.context.expr}</code><br>` : ''}
-          ${err.context && err.context.type ? `<b>Type:</b> ${err.context.type}<br>` : ''}
-          <b>Time:</b> ${new Date(err.timestamp).toLocaleString()}
-        </div>
-      `;
+        const title = '<div style=\'font-weight:bold;\'>' + String(i + 1) + '. ' + escapeHTML(err.error?.message || err.error || 'Unknown error') + '</div>';
+        const details = '<div style=\'color:#333; font-size:12px;\'>' + (err.context && err.context.expr ? '<b>Expr:</b> <code>' + escapeHTML(err.context.expr) + '</code><br>' : '') + (err.context && err.context.type ? '<b>Type:</b> ' + escapeHTML(err.context.type) + '<br>' : '') + '<b>Time:</b> ' + escapeHTML(new Date(err.timestamp).toLocaleString()) + '</div>';
+        div.innerHTML = title + details;
         wrapper.appendChild(div);
       });
       container.appendChild(wrapper);
@@ -4534,10 +5259,14 @@
       return /bot|crawler|spider|googlebot|bingbot|facebookexternalhit|twitterbot/i.test(ua);
     }
 
-    renderForSEO() {
+    async renderForSEO() {
       this.processAllDirectivesSync();
       this.loadAllComponentsSync();
-      this.executeAllFetchSync();
+      try {
+        await this.executeAllFetchSync();
+      } catch (e) {
+        console.warn('renderForSEO: some fetches did not complete in time or errored', e);
+      }
       this.generateMetaTags();
     }
 
@@ -4566,7 +5295,7 @@
       });
     }
 
-    executeAllFetchSync() {
+    async executeAllFetchSync() {
       const fetchElements = document.querySelectorAll('[\\@fetch]');
       const fetchPromises = [];
       fetchElements.forEach(el => {
@@ -4591,12 +5320,13 @@
         );
       });
       if (fetchPromises.length > 0) {
-        const start = Date.now();
-        let done = false;
-        Promise.all(fetchPromises).then(() => { done = true; });
-        while (!done && Date.now() - start < 2000) {
-          // Block
-        }
+        // Wait for all fetches to settle, but don't block the main thread.
+        // Keep previous behaviour: give up after ~2000ms.
+        const allSettledPromise = Promise.allSettled(fetchPromises);
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Await whichever finishes first (either all settled or timeout)
+        await Promise.race([allSettledPromise, timeoutPromise]);
       }
     }
 
@@ -4614,388 +5344,11 @@
       }
     }
 
-    // NEW: SSR Methods
-    renderToString(template, initialState = {}) {
-      if (!this.isServerSide() && !this.options.ssr) {
-        throw new Error('renderToString can only be called in SSR mode');
-      }
 
-      // Set SSR mode
-      this._isSSRMode = true;
-      this.state = { ...this.state, ...initialState };
-
-      // Initialize state
-      this._preInitializeEssentialVariables();
-      this._runInitBlocks();
-
-      // Parse template directly for SSR
-      this._vdom = this._parseTemplateForSSR(template);
-
-      // Render to string
-      const rendered = this._renderVNodeToString(this._vdom, this.state);
-
-      // Prepare hydration data
-      this._hydrationData = {
-        state: this._serializeState(this.state),
-        version: AyishaVDOM.version
-      };
-
-      return {
-        html: rendered,
-        state: this._hydrationData.state,
-        hydrationScript: this._generateHydrationScript()
-      };
-    }
-
-    _parseTemplateForSSR(template) {
-      // Basic HTML parser for SSR
-      const stack = [];
-      const root = { tag: 'fragment', children: [], directives: {} };
-      let current = root;
-      
-      // Simple regex-based HTML parsing
-      const htmlRegex = /<(\/?[a-zA-Z][a-zA-Z0-9]*)((?:\s+[^>]*)?)>/g;
-      let lastIndex = 0;
-      let match;
-      
-      while ((match = htmlRegex.exec(template)) !== null) {
-        // Add text content before this tag
-        const textBefore = template.slice(lastIndex, match.index).trim();
-        if (textBefore) {
-          current.children.push({
-            type: 'text',
-            text: textBefore
-          });
-        }
-        
-        const tagName = match[1];
-        const attributes = match[2];
-        
-        if (tagName.startsWith('/')) {
-          // Closing tag
-          if (stack.length > 0) {
-            current = stack.pop();
-          }
-        } else {
-          // Opening tag
-          const element = {
-            tag: tagName.toLowerCase(),
-            children: [],
-            directives: {},
-            attrs: {}
-          };
-          
-          // Parse attributes
-          if (attributes) {
-            // Handle double-quoted attributes
-            const quotedAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*"([^"]*)"/g;
-            let quotedMatch;
-            while ((quotedMatch = quotedAttrRegex.exec(attributes)) !== null) {
-              const attrName = quotedMatch[1];
-              const attrValue = quotedMatch[2];
-              
-              if (attrName.startsWith('@')) {
-                element.directives[attrName] = attrValue;
-              } else {
-                element.attrs[attrName] = attrValue;
-              }
-            }
-            
-            // Handle single-quoted attributes
-            const singleQuotedAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*'([^']*)'/g;
-            let singleMatch;
-            while ((singleMatch = singleQuotedAttrRegex.exec(attributes)) !== null) {
-              const attrName = singleMatch[1];
-              const attrValue = singleMatch[2];
-              
-              if (attrName.startsWith('@')) {
-                element.directives[attrName] = attrValue;
-              } else {
-                element.attrs[attrName] = attrValue;
-              }
-            }
-            
-            // Also handle attributes without quotes for simple values
-            const simpleAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*([^"'\s>]+)/g;
-            let simpleMatch;
-            while ((simpleMatch = simpleAttrRegex.exec(attributes)) !== null) {
-              const attrName = simpleMatch[1];
-              const attrValue = simpleMatch[2];
-              
-              if (attrName.startsWith('@')) {
-                element.directives[attrName] = attrValue;
-              } else {
-                element.attrs[attrName] = attrValue;
-              }
-            }
-          }
-          
-          current.children.push(element);
-          
-          // Check if it's a self-closing tag
-          const selfClosingTags = ['img', 'br', 'hr', 'input', 'meta', 'link'];
-          if (!selfClosingTags.includes(tagName.toLowerCase()) && !attributes.includes('/')) {
-            stack.push(current);
-            current = element;
-          }
-        }
-        
-        lastIndex = htmlRegex.lastIndex;
-      }
-      
-      // Add remaining text
-      const remainingText = template.slice(lastIndex).trim();
-      if (remainingText) {
-        current.children.push({
-          type: 'text',
-          text: remainingText
-        });
-      }
-      
-      return root;
-    }
-
-    _createVirtualElement(tagName) {
-      // Enhanced DOM-like object for SSR
-      const element = {
-        tagName: tagName.toUpperCase(),
-        innerHTML: '',
-        textContent: '',
-        setAttribute: function(name, value) {
-          this.attributes = this.attributes || {};
-          this.attributes[name] = value;
-        },
-        getAttribute: function(name) {
-          return this.attributes?.[name] || null;
-        },
-        hasAttribute: function(name) {
-          return this.attributes && name in this.attributes;
-        },
-        childNodes: [],
-        children: [],
-        nodeType: 1,
-        attributes: {},
-        appendChild: function(child) {
-          this.childNodes.push(child);
-          if (child.nodeType === 1) {
-            this.children.push(child);
-          }
-        },
-        querySelector: function(selector) {
-          // Basic implementation for SSR
-          return null;
-        },
-        querySelectorAll: function(selector) {
-          return [];
-        }
-      };
-      
-      // When innerHTML is set, parse it into child nodes
-      Object.defineProperty(element, 'innerHTML', {
-        get: function() {
-          return this._innerHTML || '';
-        },
-        set: function(html) {
-          this._innerHTML = html;
-          this.childNodes = [];
-          this.children = [];
-          
-          if (html) {
-            // Simple HTML parsing for SSR
-            this._parseHTML(html);
-          }
-        }
-      });
-      
-      element._parseHTML = function(html) {
-        // Basic HTML parsing - create text nodes for now
-        if (html.trim()) {
-          const textNode = {
-            nodeType: 3,
-            textContent: html,
-            nodeValue: html
-          };
-          this.childNodes.push(textNode);
-        }
-      };
-      
-      return element;
-    }
-
-    _renderVNodeToString(vNode, ctx) {
-      if (!vNode) return '';
-
-      if (vNode.type === 'text') {
-        return this._escapeHtml(this.evaluator.evalText(vNode.text, ctx));
-      }
-
-      if (vNode.tag === 'fragment') {
-        return vNode.children.map(child => this._renderVNodeToString(child, ctx)).join('');
-      }
-
-      // Handle conditional rendering
-      if (vNode.directives && vNode.directives['@if'] && !this.evaluator.evalExpr(vNode.directives['@if'], ctx)) return '';
-      if (vNode.directives && vNode.directives['@show'] && !this.evaluator.evalExpr(vNode.directives['@show'], ctx)) return '';
-      if (vNode.directives && vNode.directives['@hide'] && this.evaluator.evalExpr(vNode.directives['@hide'], ctx)) return '';
-
-      // Handle @for directive in SSR
-      if (vNode.directives && vNode.directives['@for']) {
-        return this._handleForDirectiveSSR(vNode, ctx);
-      }
-
-      // Handle @switch directive in SSR
-      if (vNode.directives && vNode.directives['@switch']) {
-        return this._handleSwitchDirectiveSSR(vNode, ctx);
-      }
-
-      // Handle component directive in SSR
-      if (vNode.tag === 'component') {
-        return this._handleComponentDirectiveSSR(vNode, ctx);
-      }
-
-      // Regular element rendering
-      let html = `<${vNode.tag}`;
-
-      // Add attributes
-      Object.entries(vNode.attrs || {}).forEach(([k, v]) => {
-        const value = this.evaluator.evalAttrValue ? this.evaluator.evalAttrValue(v, ctx) : v;
-        html += ` ${k}="${this._escapeHtml(value)}"`;
-      });
-
-      // Add data attributes for hydration
-      if (vNode.directives && Object.keys(vNode.directives).length > 0) {
-        html += ` data-ayisha-hydrate="true"`;
-        html += ` data-ayisha-directives="${this._escapeHtml(JSON.stringify(vNode.directives))}"`;
-      }
-
-      html += '>';
-
-      // Handle @text directive
-      if (vNode.directives && vNode.directives['@text']) {
-        const textValue = this.evaluator.evalExpr(vNode.directives['@text'], ctx);
-        html += this._escapeHtml(String(textValue || ''));
-      } else {
-        // Render children
-        if (vNode.children) {
-          vNode.children.forEach(child => {
-            html += this._renderVNodeToString(child, ctx);
-          });
-        }
-      }
-
-      html += `</${vNode.tag}>`;
-      return html;
-    }
-
-    _handleForDirectiveSSR(vNode, ctx) {
-      let match = vNode.directives['@for'].match(/(\w+),\s*(\w+) in (.+)/);
-      if (match) {
-        const [, indexVar, itemVar, expr] = match;
-        let arr = this.evaluator.evalExpr(expr, ctx) || [];
-        if (typeof arr === 'object' && !Array.isArray(arr)) arr = Object.values(arr);
-        
-        return arr.map((val, index) => {
-          const clone = JSON.parse(JSON.stringify(vNode));
-          delete clone.directives['@for'];
-          const subCtx = { ...ctx, [itemVar]: val, [indexVar]: index };
-          return this._renderVNodeToString(clone, subCtx);
-        }).join('');
-      }
-
-      match = vNode.directives['@for'].match(/(\w+) in (.+)/);
-      if (match) {
-        const [, itemVar, expr] = match;
-        let arr = this.evaluator.evalExpr(expr, ctx) || [];
-        if (typeof arr === 'object' && !Array.isArray(arr)) arr = Object.values(arr);
-        
-        return arr.map((val, index) => {
-          const clone = JSON.parse(JSON.stringify(vNode));
-          delete clone.directives['@for'];
-          const subCtx = { ...ctx, [itemVar]: val, $index: index };
-          return this._renderVNodeToString(clone, subCtx);
-        }).join('');
-      }
-
-      return '';
-    }
-
-    _handleSwitchDirectiveSSR(vNode, ctx) {
-      const swVal = this.evaluator.evalExpr(vNode.directives['@switch'], ctx);
-      for (const child of vNode.children || []) {
-        if (!child.directives) continue;
-        if (child.directives['@case'] != null) {
-          let cv = child.directives['@case'];
-          if (/^['"].*['"]$/.test(cv)) cv = cv.slice(1, -1);
-          if (String(cv) === String(swVal)) {
-            return this._renderVNodeToString(child, ctx);
-          }
-        }
-        if (child.directives['@default'] != null) {
-          return this._renderVNodeToString(child, ctx);
-        }
-      }
-      return '';
-    }
-
-    _handleComponentDirectiveSSR(vNode, ctx) {
-      // For SSR, we'll need to have components pre-loaded or return a placeholder
-      const src = vNode.directives['@src'];
-      if (src && this.componentManager?.getCachedComponent(src)) {
-        const componentHtml = this.componentManager.getCachedComponent(src);
-        return componentHtml; // In real SSR, this would be parsed and rendered
-      }
-      return `<!-- Component: ${src || 'unknown'} -->`;
-    }
-
-    _escapeHtml(text) {
-      const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      };
-      return String(text).replace(/[&<>"']/g, m => map[m]);
-    }
-
-    _serializeState(state) {
-      // Remove non-serializable properties
-      const serializable = {};
-      Object.keys(state).forEach(key => {
-        if (typeof state[key] !== 'function' && key !== '_ayishaInstance') {
-          try {
-            JSON.stringify(state[key]);
-            serializable[key] = state[key];
-          } catch (e) {
-            // Skip non-serializable values
-          }
-        }
-      });
-      return serializable;
-    }
-
-    _generateHydrationScript() {
-      return `
-<script>
-window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
-</script>`;
-    }
-
-    static version = "1.1.0";
-
-    // SSR Detection and Configuration
-    isServerSide() {
-      return typeof window === 'undefined' || typeof document === 'undefined' || typeof global !== 'undefined';
-    }
-
-    isNodeJS() {
-      return typeof process !== 'undefined' && process.versions && process.versions.node;
-    }
+    static version = "1.0.4";
 
     constructor(root = document.body, options = {}) {
-      // SSR Configuration
       this.options = {
-        ssr: false,
         hydration: false,
         initialState: {},
         ...options
@@ -5015,11 +5368,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       this._componentRenderTimeout = null;
       this._setNodes = new WeakSet();
 
-      // SSR specific properties
-      this._isSSRMode = this.options.ssr || this.isServerSide();
       this._isHydrationMode = this.options.hydration;
-      this._ssrOutput = '';
-      this._hydrationData = {};
 
       this.evaluator = new ExpressionEvaluator(this.state);
       this.parser = new DOMParser(this._initBlocks);
@@ -5033,7 +5382,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       this.centralLogger = new CentralLogger();
       this.centralLogger.initializeLoggers(this.evaluator, this.fetchManager, this.componentManager);
 
-      // Initialize the modular directive system
       this.directiveManager = new DirectiveManager(
         this.evaluator,
         this.bindingManager,
@@ -5062,7 +5410,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       }
 
       if (this.isBot && typeof this.isBot === 'function' && this.isBot()) {
-        this.renderForSEO();
+        this.renderForSEO().catch(() => { });
       }
       if (typeof window !== 'undefined') {
         window.ayisha = this;
@@ -5162,26 +5510,25 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         }
       });
 
-      const essentialVars = ['_validate', '_currentPage', '_version', '_locale'];
+      const essentialVars = ['_validate', '_currentPage', '_params', '_version', '_locale'];
       essentialVars.forEach(varName => {
         if (!(varName in this.state)) {
           if (varName === '_validate') this.state[varName] = {};
           else if (varName === '_currentPage') this.state[varName] = '';
+          else if (varName === '_params') this.state[varName] = [];
           else if (varName === '_version') this.state[varName] = AyishaVDOM.version;
           else if (varName === '_locale') {
-            this.state[varName] = typeof navigator !== 'undefined' 
+            this.state[varName] = typeof navigator !== 'undefined'
               ? (navigator.language || navigator.userLanguage || 'en')
               : 'en';
           }
         }
       });
 
-      // Remove any _ayishaInstance that might have been accidentally added
       if ('_ayishaInstance' in this.state) {
         delete this.state._ayishaInstance;
       }
 
-      // Clean up invalid variable names that contain operators
       const stateKeysToRemove = Object.keys(this.state).filter(key => {
         return key.includes('=') || key.includes('<') || key.includes('>') ||
           key.includes('!') || key.includes('&') || key.includes('|') ||
@@ -5199,12 +5546,11 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       if (!this.state._currentPage) this.state._currentPage = '';
       if (!this.state._version) this.state._version = AyishaVDOM.version;
       if (!this.state._locale) {
-        this.state._locale = typeof navigator !== 'undefined' 
+        this.state._locale = typeof navigator !== 'undefined'
           ? (navigator.language || navigator.userLanguage || 'en')
           : 'en';
       }
 
-      // Remove any circular references
       if ('_ayishaInstance' in this.state) {
         delete this.state._ayishaInstance;
       }
@@ -5222,7 +5568,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
           this.state._currentBreakpoint = getBreakpoint(window.innerWidth);
           this.state._screenSize = window.innerWidth;
         } else {
-          // SSR defaults
           this.state._currentBreakpoint = 'lg';
           this.state._screenSize = 1200;
         }
@@ -5303,12 +5648,10 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       if (this._isRendering) return;
       this._isRendering = true;
 
-      // Preventive cleanup of circular references
       if ('_ayishaInstance' in this.state) {
         delete this.state._ayishaInstance;
       }
 
-      // Clean up invalid variable names that contain operators (aggressive cleanup)
       const stateKeysToRemove = Object.keys(this.state).filter(key => {
         return key.includes('=') || key.includes('<') || key.includes('>') ||
           key.includes('!') || key.includes('&') || key.includes('|') ||
@@ -5411,7 +5754,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         try {
           const savedDirectiveInfo = JSON.parse(el.getAttribute('data-ayisha-log-info') || '{}');
 
-          // Crea il display del log
           const logDisplay = document.createElement('div');
           logDisplay.className = 'ayisha-log-display';
           logDisplay.style.cssText = `
@@ -5430,7 +5772,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
           `;
 
           const logContent = this._generateInlineLogContent(el, savedDirectiveInfo);
-          logDisplay.innerHTML = logContent;
+          logDisplay.innerHTML = sanitizeHTML(logContent);
 
           if (el.parentNode) {
             el.parentNode.insertBefore(logDisplay, el.nextSibling);
@@ -5441,7 +5783,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         }
       });
 
-      // Gestisci gli elementi con errori di log
       const logErrorElements = this.root.querySelectorAll('[data-ayisha-log-error]');
 
       logErrorElements.forEach(el => {
@@ -5460,7 +5801,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
           font-weight: bold !important;
           display: block !important;
         `;
-        errorDisplay.innerHTML = `❌ Log Error: ${errorMessage}`;
+        errorDisplay.innerHTML = '❌ Log Error: ' + escapeHTML(errorMessage);
 
         if (el.parentNode) {
           el.parentNode.insertBefore(errorDisplay, el.nextSibling);
@@ -5532,7 +5873,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         });
       });
 
-      // Se non ci sono direttive tracciate ma ci sono direttive totali
       if (directiveCount === 0) {
         html += `<div style="color: #ff9966; font-style: italic; margin: 4px 0;">
           ⚠️ Element has @log but no other directives
@@ -5729,21 +6069,38 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
     }
 
     _renderVNode(vNode, ctx) {
+
       if (!vNode) return null;
 
-      // Create completion listener if @then or @finally are present
-      let completionListener = null;
-      if (vNode && (vNode.directives?.['@then'] || vNode.directives?.['@finally'])) {
-        completionListener = new DirectiveCompletionListener(vNode, ctx, this);
-
-        // Register @then expressions
-        if (vNode.directives['@then']) {
-          completionListener.addThen(vNode.directives['@then']);
+      let mergedCtx = ctx;
+      if (vNode.scopedVars && typeof vNode.scopedVars === 'object') {
+        mergedCtx = Object.assign(Object.create(ctx || null), mergedCtx);
+        for (const [k, v] of Object.entries(vNode.scopedVars)) {
+          let val = v;
+          try {
+            val = this.evaluator.evalExpr(v, ctx);
+          } catch { }
+          mergedCtx[k] = val;
         }
+      }
 
-        // Register @finally expressions
-        if (vNode.directives['@finally']) {
-          completionListener.addFinally(vNode.directives['@finally']);
+      let completionListener = null;
+      if (vNode && vNode.directives && Object.keys(vNode.directives).length > 0) {
+        // Escludi @then e @finally dal conteggio per evitare loop
+        const hasOtherDirectives = Object.keys(vNode.directives)
+          .some(key => key !== '@then' && key !== '@finally');
+
+        if (hasOtherDirectives || vNode.directives['@then'] || vNode.directives['@finally']) {
+          completionListener = new DirectiveCompletionListener(vNode, mergedCtx, this);
+
+          // Registra @then e @finally se presenti
+          if (vNode.directives['@then']) {
+            completionListener.addThen(vNode.directives['@then']);
+          }
+
+          if (vNode.directives['@finally']) {
+            completionListener.addFinally(vNode.directives['@finally']);
+          }
         }
       }
 
@@ -5758,13 +6115,12 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         }
         setExprs.forEach(expr => {
           try {
-            // Only assign if variable does not exist or is undefined
             const assignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=([^=].*)/g;
             let match;
             while ((match = assignmentRegex.exec(expr)) !== null) {
               const varName = match[1];
               if (!(varName in this.state) || this.state[varName] === undefined) {
-                this.state[varName] = this.evaluator.evalExpr(match[2], ctx);
+                this.state[varName] = this.evaluator.evalExpr(match[2], mergedCtx);
               }
             }
           } catch (e) {
@@ -5778,7 +6134,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       }
 
       Object.entries(vNode.directives || {}).forEach(([dir, expr]) => {
-        // Only ensure variables for simple variable names (no operators, quotes, etc.)
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
           !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
           !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
@@ -5790,7 +6145,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
 
       Object.values(vNode.subDirectives || {}).forEach(ev =>
         Object.values(ev).forEach(expr => {
-          // Only ensure variables for simple variable names
           if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
             !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
             !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
@@ -5862,14 +6216,12 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       if (vNode.directives['@hide'] && this.evaluator.evalExpr(vNode.directives['@hide'], ctx)) return null;
 
       if (vNode.directives['@for']) {
-        // Usa la classe ForDirective tramite il manager
         const forDirective = this.directiveManager.directives.get('@for');
         const stateWithInstance = { ...this.state, _ayishaInstance: this };
         return forDirective.apply(vNode, ctx, stateWithInstance, null, completionListener);
       }
 
       if (vNode.directives['@switch']) {
-        // Usa la classe SwitchDirective tramite il manager
         const switchDirective = this.directiveManager.directives.get('@switch');
         const stateWithInstance = { ...this.state, _ayishaInstance: this };
         return switchDirective.apply(vNode, ctx, stateWithInstance, null, completionListener);
@@ -5884,7 +6236,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
           const pageName = vNode.directives['@page'];
           const currentPage = this.state._currentPage || this.state.currentPage;
           if (String(pageName) !== String(currentPage)) {
-            this._handleComponentDirective(vNode, ctx, completionListener);
             return null;
           }
         }
@@ -5896,23 +6247,20 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       }
 
       const el = document.createElement(vNode.tag);
-      // Prevent default submit for all forms (Ayisha global patch)
       if (vNode.tag === 'form') {
         el.addEventListener('submit', function (e) {
           e.preventDefault();
         });
       }
-      // PATCH: Se c'è @go, aggiungi attributo identificativo
       if (vNode.directives && vNode.directives['@go'] && vNode._goId) {
         el.setAttribute('data-ayisha-go-id', vNode._goId);
         el.style.cursor = 'pointer';
       }
 
       Object.entries(vNode.attrs).forEach(([k, v]) => {
-        el.setAttribute(k, this.evaluator.evalAttrValue(v, ctx));
+        el.setAttribute(k, this.evaluator.evalAttrValue(v, mergedCtx));
       });
 
-      // Pre-save original text for @text:hover and similar sub-directives
       if (vNode.subDirectives?.['@text']) {
         if (vNode.children && vNode.children.length > 0) {
           el._ayishaOriginalText = vNode.children
@@ -5924,18 +6272,23 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         }
       }
 
-      this._handleSpecialDirectives(el, vNode, ctx);
+      this._handleSpecialDirectives(el, vNode, mergedCtx);
+      this.directiveManager.applyDirectives(vNode, mergedCtx, this.state, el, completionListener);
 
-      // Use the modular directive manager to apply all directives
-      this.directiveManager.applyDirectives(vNode, ctx, this.state, el, completionListener);
+      if (vNode.directives && vNode.directives['@text']) {
+        vNode.children.forEach(child => {
+          if (child.type !== 'text') {
+            const node = this._renderVNode(child, mergedCtx);
+            if (node) el.appendChild(node);
+          }
+        });
+      } else {
+        vNode.children.forEach(child => {
+          const node = this._renderVNode(child, mergedCtx);
+          if (node) el.appendChild(node);
+        });
+      }
 
-      vNode.children.forEach(child => {
-        const node = this._renderVNode(child, ctx);
-        if (node) el.appendChild(node);
-      });
-
-      // Mark completion for sync directives if using completion listener
-      // ULTRA-FIX: markSyncDone() must be called only ONCE and only if not already done, and only if total > 0
       if (completionListener && !completionListener.done && completionListener.total > 0) {
         completionListener.markSyncDone();
       }
@@ -6043,9 +6396,19 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
     }
 
     _handleComponentDirective(vNode, ctx, completionListener = null) {
+      let componentCtx = Object.create(ctx || null);
+      if (vNode.scopedVars && typeof vNode.scopedVars === 'object') {
+        for (const [k, v] of Object.entries(vNode.scopedVars)) {
+          let val = v;
+          try {
+            val = this.evaluator.evalExpr(v, ctx);
+          } catch { }
+          componentCtx[k] = val;
+        }
+      }
       const componentDirective = this.directiveManager.directives.get('@component');
       const stateWithInstance = { ...this.state, _ayishaInstance: this };
-      return componentDirective.apply(vNode, ctx, stateWithInstance, null, completionListener);
+      return componentDirective.apply(vNode, componentCtx, stateWithInstance, null, completionListener);
     }
 
     _processComponentInitBlocks(tempDiv) {
@@ -6127,7 +6490,8 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       const span = document.createElement('span');
 
       if (vNode.rawContent !== undefined) {
-        span.textContent = vNode.rawContent;
+        const interpolated = this.evaluator.evalText(vNode.rawContent, ctx);
+        span.textContent = interpolated;
       } else {
         let rawContent = '';
 
@@ -6170,7 +6534,8 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
           rawContent = vNode.children.map(collectTextContent).join('');
         }
 
-        span.textContent = rawContent;
+        const interpolated = this.evaluator.evalText(rawContent, ctx);
+        span.textContent = interpolated;
       }
 
       return span;
@@ -6184,7 +6549,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         if (!this._processedSetDirectives.has(setId)) {
           this._processedSetDirectives.add(setId);
           try {
-            // Only assign if variable does not exist or is undefined
             const assignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=([^=].*)/g;
             let match;
             while ((match = assignmentRegex.exec(setExpr)) !== null) {
@@ -6198,14 +6562,12 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
             el.setAttribute('data-ayisha-set-error', e.message);
           }
         }
-        // Remove @set from VDOM so it doesn't interfere with other directives
         vNode._setProcessed = true;
         delete vNode.directives['@set'];
-        // Remove element from DOM (if possible)
         if (el.parentNode) {
           el.parentNode.removeChild(el);
         }
-        return; // Do not process further directives for this node
+        return;
       }
 
       if (vNode.directives.hasOwnProperty('@attr')) {
@@ -6309,7 +6671,6 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       }
 
       this._preInitializeEssentialVariables();
-      // PATCH: Make state reactive BEFORE running <init> blocks, so all assignments are tracked
       this._makeReactive();
       this._runInitBlocks();
       this.reactivitySystem.enableWatchers();
@@ -6330,15 +6691,26 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
           if (el.hasAttribute('@link')) {
             e.preventDefault();
             const targetPage = el.getAttribute('@link');
-
-            // Determina il percorso corretto
             let finalPage = targetPage;
             if (targetPage.startsWith('/')) {
               finalPage = targetPage.substring(1);
             }
-
             this.state._currentPage = finalPage;
             this.render();
+            return;
+          }
+          if (el.tagName === 'A' && el.hasAttribute('href')) {
+            const href = el.getAttribute('href');
+            if (href && (href === 'index.html' || href === './index.html' || href === '/index.html')) {
+              e.preventDefault();
+              window.location.href = '/index.html';
+              return;
+            }
+            if (href && !/^(https?:|ftp:|mailto:|tel:|#|javascript:)/i.test(href)) {
+              e.preventDefault();
+              window.location.href = '/' + href.replace(/^\/+/, '');
+              return;
+            }
             return;
           }
           el = el.parentNode;
@@ -6346,203 +6718,47 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       }, true);
     }
 
-    // NEW: Hydration method for client-side
-    hydrate(hydrationData = null) {
-      // Check if we're in browser and have SSR data
-      if (typeof window !== 'undefined') {
-        const ssrData = hydrationData || window.__AYISHA_HYDRATION_DATA__;
-        if (ssrData && ssrData.state) {
-          // Merge SSR state with current state
-          this.state = { ...this.state, ...ssrData.state };
-          this._isHydrationMode = true;
-        }
-      }
-
-      // Parse existing DOM structure
-      this._vdom = this.parse(this.root);
-
-      // Initialize without re-rendering DOM
-      this._preInitializeEssentialVariables();
-      this._makeReactive();
-      this._runInitBlocks();
-      this.reactivitySystem.enableWatchers();
-      this._setupRouting();
-      this.router.setupCurrentPageProperty();
-
-      // Hydrate event listeners and bindings
-      this._hydrateEventListeners();
-      this._hydrateBindings();
-
-      // Set up component loading
-      this.preloadComponents();
-
-      console.log('🌊 Ayisha.js hydrated successfully');
-      return this;
-    }
-
-    _hydrateEventListeners() {
-      // Find all elements with directives and re-attach event listeners
-      const elementsWithDirectives = this.root.querySelectorAll('[data-ayisha-hydrate="true"]');
-      
-      elementsWithDirectives.forEach(el => {
-        try {
-          const directivesAttr = el.getAttribute('data-ayisha-directives');
-          if (directivesAttr) {
-            const directives = JSON.parse(directivesAttr);
-            const vNode = {
-              tag: el.tagName.toLowerCase(),
-              directives,
-              subDirectives: {}
-            };
-
-            // Apply interactive directives only
-            this._hydrateInteractiveDirectives(vNode, this.state, el);
-          }
-        } catch (e) {
-          console.warn('Failed to hydrate element:', e, el);
-        }
-      });
-    }
-
-    _hydrateInteractiveDirectives(vNode, ctx, el) {
-      // Only hydrate interactive directives that need event listeners
-      const interactiveDirectives = [
-        '@click', '@input', '@change', '@focus', '@blur', '@hover', '@model'
-      ];
-
-      interactiveDirectives.forEach(directive => {
-        if (vNode.directives[directive]) {
-          const directiveInstance = this.directiveManager.getDirective(directive);
-          if (directiveInstance) {
-            try {
-              directiveInstance.apply(vNode, ctx, this.state, el);
-            } catch (e) {
-              console.warn(`Failed to hydrate directive ${directive}:`, e);
-            }
-          }
-        }
-      });
-    }
-
-    _hydrateBindings() {
-      // Re-establish model bindings for form elements
-      const formElements = this.root.querySelectorAll('input, textarea, select');
-      formElements.forEach(el => {
-        const modelAttr = el.getAttribute('@model') || el.getAttribute('data-model');
-        if (modelAttr) {
-          this.bindingManager.bindModel(el, modelAttr, this.state);
-        }
-      });
-    }
   }
 
-  // Export for browser
+
   if (typeof window !== 'undefined') {
     window.AyishaVDOM = AyishaVDOM;
   }
 
-  // Export for Node.js (SSR support)
+  const Ayisha = AyishaVDOM;
+
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = AyishaVDOM;
+    module.exports = { AyishaVDOM, Ayisha: AyishaVDOM };
+    module.exports.default = AyishaVDOM;
+  } else if (typeof define === 'function' && define.amd) {
+    // AMD
+    define([], function () {
+      return { AyishaVDOM, Ayisha: AyishaVDOM, default: AyishaVDOM };
+    });
+  } else if (typeof window !== 'undefined') {
+    window.Ayisha = AyishaVDOM;
   }
 
-  // Static method for SSR usage
-  AyishaVDOM.createSSRInstance = function(options = {}) {
-    const mockRoot = {
-      childNodes: [],
-      querySelectorAll: () => [],
-      addEventListener: () => {},
-      innerHTML: ''
-    };
-    return new AyishaVDOM(mockRoot, { ...options, ssr: true });
-  };
-
-  // Static method for easy hydration
-  AyishaVDOM.hydrate = function(root = document.body, hydrationData = null) {
-    return new AyishaVDOM(root, { hydration: true }).hydrate(hydrationData);
-  };
-
-  const addDefaultAnimationStyles = () => {
-    if (typeof document === 'undefined') return; // Skip in Node.js
-    
-    const existingStyle = document.getElementById('ayisha-default-animations');
-    if (!existingStyle) {
-      const style = document.createElement('style');
-      style.id = 'ayisha-default-animations';
-      style.textContent = `
-        /* FadeIn animation for both .fadeIn and .fade-in */
-        .fadeIn, .fade-in {
-          animation: ayishaFadeIn 0.3s ease-in-out;
-        }
-
-        @keyframes ayishaFadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        /* Slide-down animation */
-        .slide-down {
-          overflow: hidden;
-          transition: height 0.3s ease-in-out;
-        }
-
-        /* Styles for @log display as sibling */
-        .ayisha-log-display {
-          background: rgba(0, 20, 40, 0.95) !important;
-          color: #fff !important;
-          padding: 8px 12px !important;
-          margin: 4px 0 !important;
-          border-radius: 6px !important;
-          font-family: 'JetBrains Mono', 'Courier New', monospace !important;
-          font-size: 11px !important;
-          border-left: 4px solid #0066cc !important;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-          max-width: 400px !important;
-          overflow-x: auto !important;
-          line-height: 1.4 !important;
-          display: block !important;
-        }
-
-        /* Styles for @log error display */
-        .ayisha-log-error-display {
-          background: rgba(255, 0, 0, 0.9) !important;
-          color: white !important;
-          padding: 8px 12px !important;
-          margin: 4px 0 !important;
-          border-radius: 6px !important;
-          font-family: monospace !important;
-          font-size: 11px !important;
-          font-weight: bold !important;
-          display: block !important;
-        }
-      `;
-      document.head.appendChild(style);
-    }
-  };
-
-  // Browser-only initialization
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        addDefaultAnimationStyles();
-        
-        // Check if we need to hydrate or mount fresh
-        if (typeof window !== 'undefined' && window.__AYISHA_HYDRATION_DATA__) {
-          new AyishaVDOM(document.body).hydrate();
-        } else {
-          new AyishaVDOM(document.body).mount();
-        }
-      });
-    } else {
-      addDefaultAnimationStyles();
-      
-      // Check if we need to hydrate or mount fresh
-      if (typeof window !== 'undefined' && window.__AYISHA_HYDRATION_DATA__) {
-        new AyishaVDOM(document.body).hydrate();
+    document.addEventListener('DOMContentLoaded', function () {
+      const tpl = document.querySelector('template');
+      if (tpl) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = tpl.innerHTML || tpl.textContent || '';
+        const ayisha = new AyishaVDOM(document.body);
+        ayisha._vdom = ayisha.parse(tempDiv);
+        ayisha.hydrateFromVDOM(ayisha._vdom);
+        window._ayishaHydrated = true;
+      } else if (window.__AYISHA_VDOM__) {
+        const ayisha = new AyishaVDOM(document.body);
+        ayisha.hydrateFromVDOM(window.__AYISHA_VDOM__);
+        window._ayishaHydrated = true;
       } else {
         new AyishaVDOM(document.body).mount();
+        window._ayishaHydrated = true;
       }
-    }
+    });
   }
+
 
 })();
