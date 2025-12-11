@@ -35,6 +35,39 @@
     }
   }
 
+  // Centralized constants and small helpers (non-behavioural refactor)
+  const AYISHA_CONSTS = {
+    JS_GLOBALS: [
+      'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp',
+      'console', 'window', 'document', 'setTimeout', 'setInterval', 'fetch', 'localStorage',
+      'sessionStorage', 'history', 'location', 'navigator', 'undefined', 'null', 'true', 'false'
+    ],
+    TIMINGS: {
+      RENDER_DEBOUNCE: 10,
+      COMPLETION_DELAY: 1500,
+      SSR_FETCH_WAIT: 2000
+    },
+    SIMPLE_IDENTIFIER_RE: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
+  };
+
+  function ayisha_hasUnsafeExpressionChars(expr) {
+    if (typeof expr !== 'string') return true;
+    const forbidden = ['=', '<', '>', '!', '&', '|', "'", '"', '(', ')', ' ', '+', '-', '*', '/', '%', '[', ']', '{', '}', '?', ':', ';', ','];
+    for (let ch of forbidden) {
+      if (expr.indexOf(ch) !== -1) return true;
+    }
+    return false;
+  }
+
+  function ayisha_isSimpleIdentifier(expr) {
+    if (typeof expr !== 'string') return false;
+    const t = expr.trim();
+    if (!t) return false;
+    if (!AYISHA_CONSTS.SIMPLE_IDENTIFIER_RE.test(t)) return false;
+    if (ayisha_hasUnsafeExpressionChars(t)) return false;
+    return true;
+  }
+
   class DirectiveCompletionListener {
     constructor(vNode, ctx, ayishaInstance) {
       this.vNode = vNode;
@@ -137,11 +170,7 @@
       if (varName in this.ayisha.evaluator.state) return;
 
       // Skip variabili globali JavaScript
-      const jsGlobals = [
-        'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp',
-        'console', 'window', 'document', 'setTimeout', 'setInterval', 'fetch', 'localStorage',
-        'sessionStorage', 'history', 'location', 'navigator', 'undefined', 'null', 'true', 'false'
-      ];
+      const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
 
       if (jsGlobals.includes(varName)) return;
 
@@ -259,9 +288,7 @@
       if (typeof expr !== 'string') return [];
       const matches = expr.match(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g);
       if (!matches) return [];
-      const jsGlobals = [
-        'true', 'false', 'null', 'undefined', 'if', 'else', 'for', 'while', 'switch', 'case', 'default', 'try', 'catch', 'finally', 'return', 'var', 'let', 'const', 'function', 'new', 'typeof', 'instanceof', 'in', 'do', 'break', 'continue', 'this', 'window', 'document', 'Math', 'Date', 'Array', 'Object', 'String', 'Number', 'Boolean', 'RegExp', 'JSON', 'console', 'setTimeout', 'setInterval', 'fetch', 'localStorage', 'sessionStorage', 'history', 'location', 'navigator'
-      ];
+      const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
       return matches.filter((v, i, arr) => arr.indexOf(v) === i && !jsGlobals.includes(v));
     }
     constructor(state) {
@@ -473,11 +500,7 @@
         return; // Don't create variables for complex expressions
       }
 
-      const jsGlobals = [
-        'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp',
-        'console', 'window', 'document', 'setTimeout', 'setInterval', 'fetch', 'localStorage',
-        'sessionStorage', 'history', 'location', 'navigator', 'undefined', 'null', 'true', 'false'
-      ];
+      const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
 
       const arrayOps = expr.match(/([\w$]+)\.(push|pop|shift|unshift|filter|map|reduce|forEach|length|slice|splice)/);
       if (arrayOps) {
@@ -2266,10 +2289,7 @@
       if (!expr) return;
 
       // Only ensure simple variable names, not complex expressions
-      if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
-        !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
-        !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
-        !expr.includes("'") && !expr.includes('"') && !expr.includes('(') && !expr.includes(')')) {
+      if (ayisha_isSimpleIdentifier(expr)) {
         this.evaluator.ensureVarInState(expr);
       }
 
@@ -2788,10 +2808,7 @@
       if (!expr) return;
 
       // Only ensure simple variable names, not complex expressions
-      if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
-        !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
-        !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
-        !expr.includes("'") && !expr.includes('"') && !expr.includes('(') && !expr.includes(')')) {
+      if (ayisha_isSimpleIdentifier(expr)) {
         this.evaluator.ensureVarInState(expr);
       }
 
@@ -2811,10 +2828,7 @@
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'focus') {
         // Only ensure simple variable names, not complex expressions
-        if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expression.trim()) &&
-          !expression.includes('=') && !expression.includes('<') && !expression.includes('>') &&
-          !expression.includes('!') && !expression.includes('&') && !expression.includes('|') &&
-          !expression.includes("'") && !expression.includes('"') && !expression.includes('(') && !expression.includes(')')) {
+        if (ayisha_isSimpleIdentifier(expression)) {
           this.evaluator.ensureVarInState(expression);
         }
         const done = completionListener ? completionListener.addAsyncTask() : null;
@@ -2839,10 +2853,7 @@
       if (!expr) return;
 
       // Only ensure simple variable names, not complex expressions
-      if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
-        !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
-        !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
-        !expr.includes("'") && !expr.includes('"') && !expr.includes('(') && !expr.includes(')')) {
+      if (ayisha_isSimpleIdentifier(expr)) {
         this.evaluator.ensureVarInState(expr);
       }
 
@@ -2862,10 +2873,7 @@
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'blur') {
         // Only ensure simple variable names, not complex expressions
-        if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expression.trim()) &&
-          !expression.includes('=') && !expression.includes('<') && !expression.includes('>') &&
-          !expression.includes('!') && !expression.includes('&') && !expression.includes('|') &&
-          !expression.includes("'") && !expression.includes('"') && !expression.includes('(') && !expression.includes(')')) {
+        if (ayisha_isSimpleIdentifier(expression)) {
           this.evaluator.ensureVarInState(expression);
         }
         const done = completionListener ? completionListener.addAsyncTask() : null;
@@ -2890,10 +2898,7 @@
       if (!expr) return;
 
       // Only ensure simple variable names, not complex expressions
-      if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
-        !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
-        !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
-        !expr.includes("'") && !expr.includes('"') && !expr.includes('(') && !expr.includes(')')) {
+      if (ayisha_isSimpleIdentifier(expr)) {
         this.evaluator.ensureVarInState(expr);
       }
 
@@ -2913,10 +2918,7 @@
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'change') {
         // Only ensure simple variable names, not complex expressions
-        if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expression.trim()) &&
-          !expression.includes('=') && !expression.includes('<') && !expression.includes('>') &&
-          !expression.includes('!') && !expression.includes('&') && !expression.includes('|') &&
-          !expression.includes("'") && !expression.includes('"') && !expression.includes('(') && !expression.includes(')')) {
+        if (ayisha_isSimpleIdentifier(expression)) {
           this.evaluator.ensureVarInState(expression);
         }
         const done = completionListener ? completionListener.addAsyncTask() : null;
@@ -2941,10 +2943,7 @@
       if (!expr) return;
 
       // Only ensure simple variable names, not complex expressions
-      if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
-        !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
-        !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
-        !expr.includes("'") && !expr.includes('"') && !expr.includes('(') && !expr.includes(')')) {
+      if (ayisha_isSimpleIdentifier(expr)) {
         this.evaluator.ensureVarInState(expr);
       }
 
@@ -2964,10 +2963,7 @@
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'input') {
         // Only ensure simple variable names, not complex expressions
-        if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expression.trim()) &&
-          !expression.includes('=') && !expression.includes('<') && !expression.includes('>') &&
-          !expression.includes('!') && !expression.includes('&') && !expression.includes('|') &&
-          !expression.includes("'") && !expression.includes('"') && !expression.includes('(') && !expression.includes(')')) {
+        if (ayisha_isSimpleIdentifier(expression)) {
           this.evaluator.ensureVarInState(expression);
         }
         const done = completionListener ? completionListener.addAsyncTask() : null;
@@ -5125,7 +5121,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
             !trimmedLine.includes('localStorage.') &&
             !trimmedLine.includes('sessionStorage.')) {
             const [, varName, value] = assignmentMatch;
-            const jsGlobals = ['JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp'];
+            const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
             if (!jsGlobals.includes(varName)) {
               return line.replace(assignmentMatch[0], `state.${varName} = ${value}`);
             }
@@ -5143,11 +5139,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         }
       });
 
-      const jsGlobals = [
-        'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp',
-        'console', 'window', 'document', 'setTimeout', 'setInterval', 'fetch', 'localStorage',
-        'sessionStorage', 'history', 'location', 'navigator', 'undefined', 'null', 'true', 'false'
-      ];
+      const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
 
       jsGlobals.forEach(globalName => {
         if (globalName in this.state) {
@@ -5779,10 +5771,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
 
       Object.entries(vNode.directives || {}).forEach(([dir, expr]) => {
         // Only ensure variables for simple variable names (no operators, quotes, etc.)
-        if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
-          !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
-          !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
-          !expr.includes("'") && !expr.includes('"') && !expr.includes('(') && !expr.includes(')')) {
+        if (ayisha_isSimpleIdentifier(expr)) {
           if (dir === '@model') this.evaluator.ensureVarInState(expr, true);
           else this.evaluator.ensureVarInState(expr);
         }
@@ -5791,10 +5780,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       Object.values(vNode.subDirectives || {}).forEach(ev =>
         Object.values(ev).forEach(expr => {
           // Only ensure variables for simple variable names
-          if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr.trim()) &&
-            !expr.includes('=') && !expr.includes('<') && !expr.includes('>') &&
-            !expr.includes('!') && !expr.includes('&') && !expr.includes('|') &&
-            !expr.includes("'") && !expr.includes('"') && !expr.includes('(') && !expr.includes(')')) {
+          if (ayisha_isSimpleIdentifier(expr)) {
             this.evaluator.ensureVarInState(expr);
           }
         })
@@ -6104,7 +6090,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
             !trimmedLine.includes('localStorage.') &&
             !trimmedLine.includes('sessionStorage.')) {
             const [, varName, value] = assignmentMatch;
-            const jsGlobals = ['JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'Math', 'RegExp'];
+            const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
             if (!jsGlobals.includes(varName)) {
               return line.replace(assignmentMatch[0], `state.${varName} = ${value}`);
             }
