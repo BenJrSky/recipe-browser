@@ -4418,208 +4418,6 @@
       return /bot|crawler|spider|googlebot|bingbot|facebookexternalhit|twitterbot/i.test(ua);
     }
 
-    renderForSEO() {
-      this.processAllDirectivesSync();
-      this.loadAllComponentsSync();
-      this.executeAllFetchSync();
-      this.generateMetaTags();
-    }
-
-    processAllDirectivesSync() {
-      Object.keys(ModularDirectives).forEach(dir => {
-        const elements = document.querySelectorAll(`[\\${dir}]`);
-        elements.forEach(el => {
-          const DirectiveClass = ModularDirectives[dir];
-          const directive = new DirectiveClass(this.evaluator, this.bindingManager, this.errorHandler);
-          const vNode = {
-            _el: el,
-            directives: { [dir]: el.getAttribute(dir) }
-          };
-          directive.apply(vNode, this.state, this.state, el);
-        });
-      });
-    }
-
-    loadAllComponentsSync() {
-      const components = document.querySelectorAll('[data-component]');
-      components.forEach(el => {
-        const componentName = el.getAttribute('data-component');
-        if (this.componentManager && this.componentManager.getComponent(componentName)) {
-          el.innerHTML = this.componentManager.getComponent(componentName);
-        }
-      });
-    }
-
-    executeAllFetchSync() {
-      const fetchElements = document.querySelectorAll('[\\@fetch]');
-      const fetchPromises = [];
-      fetchElements.forEach(el => {
-        const fetchConfig = el.getAttribute('@fetch');
-        let url = fetchConfig, resultVar = 'result';
-        const asMatch = fetchConfig.match(/(.+) as (\w+)/);
-        if (asMatch) {
-          url = asMatch[1].trim();
-          resultVar = asMatch[2].trim();
-        }
-        try {
-          url = this.evaluator.evalExpr(url, this.state);
-        } catch { }
-        if (!url) return;
-        fetchPromises.push(
-          fetch(url)
-            .then(res => res.json())
-            .then(data => {
-              this.state[resultVar] = data;
-            })
-            .catch(() => { this.state[resultVar] = null; })
-        );
-      });
-      if (fetchPromises.length > 0) {
-        const start = Date.now();
-        let done = false;
-        Promise.all(fetchPromises).then(() => { done = true; });
-        while (!done && Date.now() - start < 2000) {
-        }
-      }
-    }
-
-    generateMetaTags() {
-      const h1 = document.querySelector('h1');
-      if (h1 && !document.title) {
-        document.title = h1.textContent;
-      }
-      const content = document.body.textContent.slice(0, 160);
-      if (!document.querySelector('meta[name="description"]')) {
-        const meta = document.createElement('meta');
-        meta.name = 'description';
-        meta.content = content;
-        document.head.appendChild(meta);
-      }
-    }
-
-    renderToString(template, initialState = {}) {
-      if (!this.isServerSide() && !this.options.ssr) {
-        throw new Error('renderToString can only be called in SSR mode');
-      }
-
-      this._isSSRMode = true;
-      this.state = { ...this.state, ...initialState };
-
-      this._preInitializeEssentialVariables();
-      this._runInitBlocks();
-
-      this._vdom = this._parseTemplateForSSR(template);
-
-      const rendered = this._renderVNodeToString(this._vdom, this.state);
-
-      this._hydrationData = {
-        state: this._serializeState(this.state),
-        version: AyishaVDOM.version
-      };
-
-      return {
-        html: rendered,
-        state: this._hydrationData.state,
-        hydrationScript: this._generateHydrationScript()
-      };
-    }
-
-    _parseTemplateForSSR(template) {
-      const stack = [];
-      const root = { tag: 'fragment', children: [], directives: {} };
-      let current = root;
-      
-      const htmlRegex = /<(\/?[a-zA-Z][a-zA-Z0-9]*)((?:\s+[^>]*)?)>/g;
-      let lastIndex = 0;
-      let match;
-      
-      while ((match = htmlRegex.exec(template)) !== null) {
-        const textBefore = template.slice(lastIndex, match.index).trim();
-        if (textBefore) {
-          current.children.push({
-            type: 'text',
-            text: textBefore
-          });
-        }
-        
-        const tagName = match[1];
-        const attributes = match[2];
-        
-        if (tagName.startsWith('/')) {
-          if (stack.length > 0) {
-            current = stack.pop();
-          }
-        } else {
-          const element = {
-            tag: tagName.toLowerCase(),
-            children: [],
-            directives: {},
-            attrs: {}
-          };
-          
-          if (attributes) {
-            const quotedAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*"([^"]*)"/g;
-            let quotedMatch;
-            while ((quotedMatch = quotedAttrRegex.exec(attributes)) !== null) {
-              const attrName = quotedMatch[1];
-              const attrValue = quotedMatch[2];
-              
-              if (attrName.startsWith('@')) {
-                element.directives[attrName] = attrValue;
-              } else {
-                element.attrs[attrName] = attrValue;
-              }
-            }
-            
-            const singleQuotedAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*'([^']*)'/g;
-            let singleMatch;
-            while ((singleMatch = singleQuotedAttrRegex.exec(attributes)) !== null) {
-              const attrName = singleMatch[1];
-              const attrValue = singleMatch[2];
-              
-              if (attrName.startsWith('@')) {
-                element.directives[attrName] = attrValue;
-              } else {
-                element.attrs[attrName] = attrValue;
-              }
-            }
-            
-            const simpleAttrRegex = /([a-zA-Z@][a-zA-Z0-9_-]*)\s*=\s*([^"'\s>]+)/g;
-            let simpleMatch;
-            while ((simpleMatch = simpleAttrRegex.exec(attributes)) !== null) {
-              const attrName = simpleMatch[1];
-              const attrValue = simpleMatch[2];
-              
-              if (attrName.startsWith('@')) {
-                element.directives[attrName] = attrValue;
-              } else {
-                element.attrs[attrName] = attrValue;
-              }
-            }
-          }
-          
-          current.children.push(element);
-          
-          const selfClosingTags = ['img', 'br', 'hr', 'input', 'meta', 'link'];
-          if (!selfClosingTags.includes(tagName.toLowerCase()) && !attributes.includes('/')) {
-            stack.push(current);
-            current = element;
-          }
-        }
-        
-        lastIndex = htmlRegex.lastIndex;
-      }
-      
-      const remainingText = template.slice(lastIndex).trim();
-      if (remainingText) {
-        current.children.push({
-          type: 'text',
-          text: remainingText
-        });
-      }
-      
-      return root;
-    }
 
     _createVirtualElement(tagName) {
       const element = {
@@ -4682,163 +4480,11 @@
       
       return element;
     }
+    
 
-    _renderVNodeToString(vNode, ctx) {
-      if (!vNode) return '';
+    static version = "1.1.1";
 
-      if (vNode.type === 'text') {
-        return this._escapeHtml(this.evaluator.evalText(vNode.text, ctx));
-      }
-
-      if (vNode.tag === 'fragment') {
-        return vNode.children.map(child => this._renderVNodeToString(child, ctx)).join('');
-      }
-
-      if (vNode.directives && vNode.directives['@if'] && !this.evaluator.evalExpr(vNode.directives['@if'], ctx)) return '';
-      if (vNode.directives && vNode.directives['@show'] && !this.evaluator.evalExpr(vNode.directives['@show'], ctx)) return '';
-      if (vNode.directives && vNode.directives['@hide'] && this.evaluator.evalExpr(vNode.directives['@hide'], ctx)) return '';
-
-      if (vNode.directives && vNode.directives['@for']) {
-        return this._handleForDirectiveSSR(vNode, ctx);
-      }
-
-      if (vNode.directives && vNode.directives['@switch']) {
-        return this._handleSwitchDirectiveSSR(vNode, ctx);
-      }
-
-      if (vNode.tag === 'component') {
-        return this._handleComponentDirectiveSSR(vNode, ctx);
-      }
-
-      let html = `<${vNode.tag}`;
-
-      Object.entries(vNode.attrs || {}).forEach(([k, v]) => {
-        const value = this.evaluator.evalAttrValue ? this.evaluator.evalAttrValue(v, ctx) : v;
-        html += ` ${k}="${this._escapeHtml(value)}"`;
-      });
-
-      if (vNode.directives && Object.keys(vNode.directives).length > 0) {
-        html += ` data-ayisha-hydrate="true"`;
-        html += ` data-ayisha-directives="${this._escapeHtml(JSON.stringify(vNode.directives))}"`;
-      }
-
-      html += '>';
-
-      if (vNode.directives && vNode.directives['@text']) {
-        const textValue = this.evaluator.evalExpr(vNode.directives['@text'], ctx);
-        html += this._escapeHtml(String(textValue || ''));
-      } else {
-        if (vNode.children) {
-          vNode.children.forEach(child => {
-            html += this._renderVNodeToString(child, ctx);
-          });
-        }
-      }
-
-      html += `</${vNode.tag}>`;
-      return html;
-    }
-
-    _handleForDirectiveSSR(vNode, ctx) {
-      let match = vNode.directives['@for'].match(/(\w+),\s*(\w+) in (.+)/);
-      if (match) {
-        const [, indexVar, itemVar, expr] = match;
-        let arr = this.evaluator.evalExpr(expr, ctx) || [];
-        if (typeof arr === 'object' && !Array.isArray(arr)) arr = Object.values(arr);
-        
-        return arr.map((val, index) => {
-          const clone = JSON.parse(JSON.stringify(vNode));
-          delete clone.directives['@for'];
-          const subCtx = { ...ctx, [itemVar]: val, [indexVar]: index };
-          return this._renderVNodeToString(clone, subCtx);
-        }).join('');
-      }
-
-      match = vNode.directives['@for'].match(/(\w+) in (.+)/);
-      if (match) {
-        const [, itemVar, expr] = match;
-        let arr = this.evaluator.evalExpr(expr, ctx) || [];
-        if (typeof arr === 'object' && !Array.isArray(arr)) arr = Object.values(arr);
-        
-        return arr.map((val, index) => {
-          const clone = JSON.parse(JSON.stringify(vNode));
-          delete clone.directives['@for'];
-          const subCtx = { ...ctx, [itemVar]: val, $index: index };
-          return this._renderVNodeToString(clone, subCtx);
-        }).join('');
-      }
-
-      return '';
-    }
-
-    _handleSwitchDirectiveSSR(vNode, ctx) {
-      const swVal = this.evaluator.evalExpr(vNode.directives['@switch'], ctx);
-      for (const child of vNode.children || []) {
-        if (!child.directives) continue;
-        if (child.directives['@case'] != null) {
-          let cv = child.directives['@case'];
-          if (/^['"].*['"]$/.test(cv)) cv = cv.slice(1, -1);
-          if (String(cv) === String(swVal)) {
-            return this._renderVNodeToString(child, ctx);
-          }
-        }
-        if (child.directives['@default'] != null) {
-          return this._renderVNodeToString(child, ctx);
-        }
-      }
-      return '';
-    }
-
-    _handleComponentDirectiveSSR(vNode, ctx) {
-      const src = vNode.directives['@src'];
-      if (src && this.componentManager?.getCachedComponent(src)) {
-        const componentHtml = this.componentManager.getCachedComponent(src);
-        return componentHtml; 
-      }
-      return `<!-- Component: ${src || 'unknown'} -->`;
-    }
-
-    _escapeHtml(text) {
-      const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      };
-      return String(text).replace(/[&<>"']/g, m => map[m]);
-    }
-
-    _serializeState(state) {
-      const serializable = {};
-      Object.keys(state).forEach(key => {
-        if (typeof state[key] !== 'function' && key !== '_ayishaInstance') {
-          try {
-            JSON.stringify(state[key]);
-            serializable[key] = state[key];
-          } catch (e) {
-          }
-        }
-      });
-      return serializable;
-    }
-
-    _generateHydrationScript() {
-      return `
-<script>
-window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
-</script>`;
-    }
-
-    static version = "1.1.0";
-
-    isServerSide() {
-      return typeof window === 'undefined' || typeof document === 'undefined' || typeof global !== 'undefined';
-    }
-
-    isNodeJS() {
-      return typeof process !== 'undefined' && process.versions && process.versions.node;
-    }
+    
 
     constructor(root = document.body, options = {}) {
       this.options = {
@@ -4862,7 +4508,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       this._componentRenderTimeout = null;
       this._setNodes = new WeakSet();
 
-      this._isSSRMode = this.options.ssr || this.isServerSide();
+      this._isSSRMode = false;
       this._isHydrationMode = this.options.hydration;
       this._ssrOutput = '';
       this._hydrationData = {};
@@ -4906,9 +4552,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
         this.state._currentPage = firstPage || 'home';
       }
 
-      if (this.isBot && typeof this.isBot === 'function' && this.isBot()) {
-        this.renderForSEO();
-      }
+      
       if (typeof window !== 'undefined') {
         window.ayisha = this;
       }
@@ -6153,83 +5797,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
       }, true);
     }
 
-    hydrate(hydrationData = null) {
-      if (typeof window !== 'undefined') {
-        const ssrData = hydrationData || window.__AYISHA_HYDRATION_DATA__;
-        if (ssrData && ssrData.state) {
-          this.state = { ...this.state, ...ssrData.state };
-          this._isHydrationMode = true;
-        }
-      }
-
-      this._vdom = this.parse(this.root);
-
-      this._preInitializeEssentialVariables();
-      this._makeReactive();
-      this._runInitBlocks();
-      this.reactivitySystem.enableWatchers();
-      this._setupRouting();
-      this.router.setupCurrentPageProperty();
-
-      this._hydrateEventListeners();
-      this._hydrateBindings();
-
-      this.preloadComponents();
-
-      console.log('🌊 Ayisha.js hydrated successfully');
-      return this;
-    }
-
-    _hydrateEventListeners() {
-      const elementsWithDirectives = this.root.querySelectorAll('[data-ayisha-hydrate="true"]');
-      
-      elementsWithDirectives.forEach(el => {
-        try {
-          const directivesAttr = el.getAttribute('data-ayisha-directives');
-          if (directivesAttr) {
-            const directives = JSON.parse(directivesAttr);
-            const vNode = {
-              tag: el.tagName.toLowerCase(),
-              directives,
-              subDirectives: {}
-            };
-
-            this._hydrateInteractiveDirectives(vNode, this.state, el);
-          }
-        } catch (e) {
-          console.warn('Failed to hydrate element:', e, el);
-        }
-      });
-    }
-
-    _hydrateInteractiveDirectives(vNode, ctx, el) {
-      const interactiveDirectives = [
-        '@click', '@input', '@change', '@focus', '@blur', '@hover', '@model'
-      ];
-
-      interactiveDirectives.forEach(directive => {
-        if (vNode.directives[directive]) {
-          const directiveInstance = this.directiveManager.getDirective(directive);
-          if (directiveInstance) {
-            try {
-              directiveInstance.apply(vNode, ctx, this.state, el);
-            } catch (e) {
-              console.warn(`Failed to hydrate directive ${directive}:`, e);
-            }
-          }
-        }
-      });
-    }
-
-    _hydrateBindings() {
-      const formElements = this.root.querySelectorAll('input, textarea, select');
-      formElements.forEach(el => {
-        const modelAttr = el.getAttribute('@model') || el.getAttribute('data-model');
-        if (modelAttr) {
-          this.bindingManager.bindModel(el, modelAttr, this.state);
-        }
-      });
-    }
+    
   }
 
   if (typeof window !== 'undefined') {
@@ -6240,19 +5808,7 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
     module.exports = AyishaVDOM;
   }
 
-  AyishaVDOM.createSSRInstance = function(options = {}) {
-    const mockRoot = {
-      childNodes: [],
-      querySelectorAll: () => [],
-      addEventListener: () => {},
-      innerHTML: ''
-    };
-    return new AyishaVDOM(mockRoot, { ...options, ssr: true });
-  };
-
-  AyishaVDOM.hydrate = function(root = document.body, hydrationData = null) {
-    return new AyishaVDOM(root, { hydration: true }).hydrate(hydrationData);
-  };
+  
 
   const addDefaultAnimationStyles = () => {
     if (typeof document === 'undefined') return; 
@@ -6316,21 +5872,11 @@ window.__AYISHA_HYDRATION_DATA__ = ${JSON.stringify(this._hydrationData)};
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
         addDefaultAnimationStyles();
-        
-        if (typeof window !== 'undefined' && window.__AYISHA_HYDRATION_DATA__) {
-          new AyishaVDOM(document.body).hydrate();
-        } else {
-          new AyishaVDOM(document.body).mount();
-        }
+        new AyishaVDOM(document.body).mount();
       });
     } else {
       addDefaultAnimationStyles();
-      
-      if (typeof window !== 'undefined' && window.__AYISHA_HYDRATION_DATA__) {
-        new AyishaVDOM(document.body).hydrate();
-      } else {
-        new AyishaVDOM(document.body).mount();
-      }
+      new AyishaVDOM(document.body).mount();
     }
   }
 
