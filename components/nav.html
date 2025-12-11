@@ -1,30 +1,20 @@
-    <nav @show="isMobile==false" class="nav">
-        <div class="nav-container" @click="headerExpanded=false" >
-            <a href="#" @link="home" @class="{'nav-link': true, 'active': _currentPage === 'home'}">⌂ Home</a>
-            <a href="#" @link="categories" @class="{'nav-link': true, 'active': _currentPage === 'categories'}">⊞ Categories</a>
-            <a href="#" @link="search" @class="{'nav-link': true, 'active': _currentPage === 'search'}">⊙ Search</a>
-            <a href="#" @link="random" @class="{'nav-link': true, 'active': _currentPage === 'random'}">⊛ Random</a>
-        </div>
-    </nav>
+<nav @show="isMobile==false" class="nav">
+    <div class="nav-container" @click="headerExpanded=false">
+        <component @src="./components/links.html"></component>
+    </div>
+</nav>
 
 
-        <nav @show="isMobile==true && headerExpanded==true" class="nav">
-        <div class="nav-container" @click="headerExpanded=false" >
-            <a href="#" @link="home" @class="{'nav-link': true, 'active': _currentPage === 'home'}">⌂ Home</a>
-            <a href="#" @link="categories" @class="{'nav-link': true, 'active': _currentPage === 'categories'}">⊞ Categories</a>
-            <a href="#" @link="search" @class="{'nav-link': true, 'active': _currentPage === 'search'}">⊙ Search</a>
-            <a href="#" @link="random" @class="{'nav-link': true, 'active': _currentPage === 'random'}">⊛ Random</a>
-        </div>
-    </nav>
+<nav @show="isMobile==true && headerExpanded==true" class="nav">
+    <div class="nav-container" @click="headerExpanded=false">
+        <component @src="./components/links.html"></component>
+    </div>
+</nav>
 
-    <logic @when="_screenSize<=768" @do="isMobile=true"></logic>
-    <logic @when="_screenSize>768" @do="isMobile=false"></logic>
+<logic @when="_screenSize<=768" @do="isMobile=true"></logic>
+<logic @when="_screenSize>768" @do="isMobile=false"></logic>
 
-    <init>
-        isMobile=false
-        headerExpanded=true
-    </init>
-
-
-
-
+<init>
+    isMobile=false
+    headerExpanded=true
+</init>
