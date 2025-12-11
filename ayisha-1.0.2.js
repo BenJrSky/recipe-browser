@@ -66,6 +66,96 @@
     return true;
   }
 
+  const ExpressionCompiler = (function() {
+    const exprCache = new Map();
+    const stmtCache = new Map();
+    const funcCache = new Map();
+    const MAX_CACHE = 1000;
+    const suspiciousTokens = ['process', 'require', 'global', 'Function', 'eval', 'constructor'];
+
+    function isSuspicious(code) {
+      if (!code || typeof code !== 'string') return false;
+      const lowered = code.toLowerCase();
+      return suspiciousTokens.some(t => lowered.includes(t.toLowerCase()));
+    }
+
+    function ensureCacheSize(map) {
+      if (map.size > MAX_CACHE) {
+        map.clear();
+      }
+    }
+
+    function compileExpr(expr) {
+      const key = `expr:${expr}`;
+      if (exprCache.has(key)) return exprCache.get(key);
+
+      if (isSuspicious(expr)) {
+        console.warn('[Ayisha][Security] Suspicious expression detected (warn-only):', expr);
+      }
+
+      let fn;
+      try {
+        fn = new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){return (${expr})}}`);
+      } catch (e) {
+        console.error('[Ayisha][Compiler] Failed to compile expression:', expr, e);
+        fn = function() { return undefined; };
+      }
+
+      exprCache.set(key, fn);
+      ensureCacheSize(exprCache);
+      return fn;
+    }
+
+    function compileStmt(code) {
+      const key = `stmt:${code}`;
+      if (stmtCache.has(key)) return stmtCache.get(key);
+
+      if (isSuspicious(code)) {
+        console.warn('[Ayisha][Security] Suspicious statement detected (warn-only):', code);
+      }
+
+      let fn;
+      try {
+        fn = new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${code}}}`);
+      } catch (e) {
+        console.error('[Ayisha][Compiler] Failed to compile statement:', code, e);
+        fn = function() {};
+      }
+
+      stmtCache.set(key, fn);
+      ensureCacheSize(stmtCache);
+      return fn;
+    }
+
+    function compileFunction(params, body) {
+      const key = `fn:${params}:${body}`;
+      if (funcCache.has(key)) return funcCache.get(key);
+
+      if (isSuspicious(body)) {
+        console.warn('[Ayisha][Security] Suspicious function body detected (warn-only):', body);
+      }
+
+      let fn;
+      try {
+        fn = new Function(params, `return (${body})`);
+      } catch (e) {
+        console.error('[Ayisha][Compiler] Failed to compile function:', params, body, e);
+        fn = function() { return undefined; };
+      }
+
+      funcCache.set(key, fn);
+      ensureCacheSize(funcCache);
+      return fn;
+    }
+
+    return {
+      compileExpr,
+      compileStmt,
+      compileFunction,
+      isSuspicious
+    };
+  })();
+
   class DirectiveCompletionListener {
     constructor(vNode, ctx, ayishaInstance) {
       this.vNode = vNode;
@@ -289,7 +379,8 @@
           get: (o, k) => o[k],
           set: (o, k, v) => { o[k] = v; return true; }
         });
-        return new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){return (${expr})}}`)(sp, ctx, event);
+        const fn = ExpressionCompiler.compileExpr(expr);
+        return fn(sp, ctx, event);
       } catch {
         return undefined;
       }
@@ -312,7 +403,8 @@
 
         for (const singleExpr of expressions) {
           if (singleExpr.trim()) {
-            new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${singleExpr.trim()}}}`)(sp, ctx, event);
+            const stmtFn = ExpressionCompiler.compileStmt(singleExpr.trim());
+            stmtFn(sp, ctx, event);
           }
         }
         return true;
@@ -340,8 +432,8 @@
         }
 
         const cleanCode = processedCode;
-        new Function('state', 'ctx', 'event', `with(state){with(ctx||{}){${cleanCode}}}`)
-          (this.state, ctx || {}, event);
+        const stmt = ExpressionCompiler.compileStmt(cleanCode);
+        stmt(this.state, ctx || {}, event);
 
         if (triggerRender) {
           setTimeout(() => window.ayisha && window.ayisha.render(), 0);
@@ -4621,7 +4713,8 @@
         transformed = transformedLines.join('\n');
 
         try {
-          new Function('state', transformed)(this.state);
+          const initFn = ExpressionCompiler.compileStmt(transformed);
+          initFn(this.state);
         } catch (e) {
           console.error('Init error:', e);
         }
@@ -5423,12 +5516,14 @@
 
           if (mapExpr.includes('=>')) {
             const [param, body] = mapExpr.split('=>').map(s => s.trim());
-            fn = new Function(param.trim(), `return (${body})`);
+            fn = ExpressionCompiler.compileFunction(param.trim(), body);
           } else {
-            fn = new Function('item', `return (${mapExpr})`);
+            fn = ExpressionCompiler.compileFunction('item', mapExpr);
           }
 
-          const result = arr.map(fn);
+          const result = arr.map(item => {
+            try { return fn(item); } catch (e) { console.error('Error executing @map function:', e); return undefined; }
+          });
           setState(vNode.directives['@result'] || 'result', result);
         } catch (error) {
           console.error('Error in @map directive:', error);
@@ -5444,12 +5539,14 @@
 
           if (filterExpr.includes('=>')) {
             const [param, body] = filterExpr.split('=>').map(s => s.trim());
-            fn = new Function(param.trim(), `return (${body})`);
+            fn = ExpressionCompiler.compileFunction(param.trim(), body);
           } else {
-            fn = new Function('item', `return (${filterExpr})`);
+            fn = ExpressionCompiler.compileFunction('item', filterExpr);
           }
 
-          const result = arr.filter(fn);
+          const result = arr.filter(item => {
+            try { return !!fn(item); } catch (e) { console.error('Error executing @filter function:', e); return false; }
+          });
           setState(vNode.directives['@result'] || 'result', result);
         } catch (error) {
           console.error('Error in @filter directive:', error);
@@ -5465,9 +5562,9 @@
           if (str.includes('=>')) {
             const [params, body] = str.split('=>').map(s => s.trim());
             const [a, b] = params.replace(/[()]/g, '').split(',').map(s => s.trim());
-            redFn = new Function(a, b, `return (${body})`);
+            redFn = ExpressionCompiler.compileFunction(`${a},${b}`, body);
           } else {
-            redFn = new Function('acc', 'item', `return (${str})`);
+            redFn = ExpressionCompiler.compileFunction('acc,item', str);
           }
           const initial = vNode.directives['@initial'] ? this.evaluator.evalExpr(vNode.directives['@initial'], ctx) : undefined;
 
@@ -5567,7 +5664,8 @@
         transformed = transformedLines.join('\n');
 
         try {
-          new Function('state', transformed)(this.state);
+          const initFn = ExpressionCompiler.compileStmt(transformed);
+          initFn(this.state);
         } catch (e) {
           console.error('Component init error:', e, 'Original code:', code, 'Cleaned:', cleanCode, 'Transformed:', transformed);
         }
