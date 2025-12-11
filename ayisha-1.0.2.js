@@ -43,7 +43,7 @@
     TIMINGS: {
       RENDER_DEBOUNCE: 10,
       COMPLETION_DELAY: 1500,
-      SSR_FETCH_WAIT: 2000
+      
     },
     SIMPLE_IDENTIFIER_RE: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
   };
@@ -4488,8 +4488,6 @@
 
     constructor(root = document.body, options = {}) {
       this.options = {
-        ssr: false,
-        hydration: false,
         initialState: {},
         ...options
       };
@@ -4508,10 +4506,7 @@
       this._componentRenderTimeout = null;
       this._setNodes = new WeakSet();
 
-      this._isSSRMode = false;
-      this._isHydrationMode = this.options.hydration;
-      this._ssrOutput = '';
-      this._hydrationData = {};
+      
 
       this.evaluator = new ExpressionEvaluator(this.state);
       this.parser = new DOMParser(this._initBlocks);
