@@ -4582,11 +4582,8 @@
       
       return element;
     }
-    
 
     static version = "1.1.1";
-
-    
 
     constructor(root = document.body, options = {}) {
       this.options = {
