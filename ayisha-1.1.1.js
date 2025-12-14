@@ -3695,6 +3695,7 @@
     '@dateonly': DateOnlyDirective,
     '@time': TimeDirective
   };
+
   class DirectiveManager {
     constructor(evaluator, bindingManager, errorHandler, fetchManager) {
       this.directives = new Map();
@@ -3707,54 +3708,13 @@
     }
 
     initializeDirectives() {
-      this.register('@if', new IfDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@not', new NotDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@for', new ForDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@form', new FormDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@model', new ModelDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@file', new FileDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@files', new FilesDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@hide', new HideDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@text', new TextDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@date', new DateDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@dateonly', new DateOnlyDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@time', new TimeDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@class', new ClassDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@style', new StyleDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@click', new ClickDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@toggle', new ToggleDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@fetch', new FetchDirective(this.evaluator, this.bindingManager, this.errorHandler, this.fetchManager));
-      this.register('@validate', new ValidateDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@state', new StateDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@log', new LogDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@attr', new AttrDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@focus', new FocusDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@blur', new BlurDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@change', new ChangeDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@input', new InputDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@when', new WhenDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@do', new DoDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@go', new GoDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@wait', new WaitDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@set', new SetDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@then', new ThenDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@finally', new FinallyDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@key', new KeyDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@src', new SrcDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@page', new PageDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@component', new ComponentDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@switch', new SwitchDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@case', new CaseDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@default', new DefaultDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@source', new SourceDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@map', new MapDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@filter', new FilterDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@reduce', new ReduceDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@initial', new InitialDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@animate', new AnimateDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@prev', new PrevDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@link', new LinkDirective(this.evaluator, this.bindingManager, this.errorHandler));
-      this.register('@hover', new HoverDirective(this.evaluator, this.bindingManager, this.errorHandler));
+      for (const [name, DirectiveClass] of Object.entries(ModularDirectives)) {
+        if (name === '@fetch') {
+          this.register(name, new DirectiveClass(this.evaluator, this.bindingManager, this.errorHandler, this.fetchManager));
+        } else {
+          this.register(name, new DirectiveClass(this.evaluator, this.bindingManager, this.errorHandler));
+        }
+      }
     }
 
     register(name, directive) {
@@ -5943,15 +5903,6 @@
     
   }
 
-  if (typeof window !== 'undefined') {
-    window.AyishaVDOM = AyishaVDOM;
-  }
-
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = AyishaVDOM;
-  }
-
-  
 
   const addDefaultAnimationStyles = () => {
     if (typeof document === 'undefined') return; 
