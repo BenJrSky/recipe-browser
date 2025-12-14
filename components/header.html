@@ -4,7 +4,7 @@
 <span @switch="_currentPage" @set="headerExpanded = true"> 
 
         <header @default class="header">
-            <button class="header-toggle" @click="headerExpanded = !headerExpanded" @class="active: headerExpanded">
+            <button class="header-toggle" @toggle="headerExpanded" @class="active: headerExpanded">
                 <span class="hamburger">
                     <span></span>
                     <span></span>

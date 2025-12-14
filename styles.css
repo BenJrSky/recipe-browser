@@ -1305,3 +1305,11 @@ init {
 .header-toggle.active .hamburger span:nth-child(3) {
     transform: rotate(-45deg) translate(6px, -6px);
 }
+
+  .intro{color:var(--muted);margin-bottom:18px}
+    .component{background:var(--panel);border:1px solid var(--border);padding:18px;margin:18px 0;border-radius:8px;box-shadow:0 1px 0 rgba(16,24,32,0.02)}
+    .live{padding:14px;border-radius:6px;background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(250,252,255,0.6));margin-bottom:12px}
+    .code{background:#f5f7fa;border:1px solid #e1e7ee;padding:12px;overflow:auto;white-space:pre-wrap}
+    pre{margin:0}
+    .meta{color:var(--muted);font-size:0.95rem;margin-bottom:8px}
+    .controls{margin-top:10px;color:var(--muted);font-size:0.95rem}

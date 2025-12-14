@@ -1216,6 +1216,7 @@
         '@file': `Esempio: <input type="file" @file="pic"> (salva il file caricato come base64 nella variabile pic)`,
         '@files': `Esempio: <input type="file" multiple @files="gallery"> (salva tutti i file caricati come base64 in un array nella variabile gallery, aggiungendo se già presenti)`,
         '@click': `Esempio: <button @click="state.count++">Aumenta</button>`,
+        '@toggle': `Esempio: <button @toggle="isVisible">Toggle</button> (inverte il valore booleano della variabile)`,
         '@fetch': `Esempio: <div @fetch="'url'" @method="'POST'" @payload="{foo:1}" @headers="{ Authorization: 'Bearer ...' }"></div>`,
         '@method': `Esempio: <div @fetch="'url'" @method="'POST'"></div>`,
         '@payload': `Esempio: <div @fetch="'url'" @method="'POST'" @payload="{foo:1}"></div>`,
@@ -1270,6 +1271,7 @@
         '@set:input': `Esempio: <input @set:input="foo='bar'">`,
         '@set:focus': `Esempio: <input @set:focus="foo='bar'">`,
         '@set:blur': `Esempio: <input @set:blur="foo='bar'">`,
+        '@toggle': `Esempio: <button @toggle="isVisible">Toggle</button>`,
         '@focus': `Esempio: <input @focus="doSomething()">`,
         '@blur': `Esempio: <input @blur="doSomething()">`,
         '@change': `Esempio: <input @change="doSomething()">`,
@@ -2518,6 +2520,52 @@
     }
   }
 
+  class ToggleDirective extends Directive {
+    apply(vNode, ctx, state, el, completionListener = null) {
+      const expr = vNode.directives['@toggle'];
+      if (!expr) return;
+
+      if (ayisha_isSimpleIdentifier(expr)) {
+        this.evaluator.ensureVarInState(expr);
+      }
+
+      const done = completionListener ? completionListener.addAsyncTask() : null;
+
+      el.addEventListener('click', (e) => {
+        try {
+          let currentValue = this.evalExpr(expr, ctx);
+          currentValue = !!currentValue; 
+          state[expr] = !currentValue;
+          setTimeout(() => window.ayisha?.render(), 0);
+          if (done) done();
+        } catch (err) {
+          this.showError(el, err, expr);
+          if (done) done();
+        }
+      });
+    }
+
+    handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
+      if (event === 'click') {
+        const done = completionListener ? completionListener.addAsyncTask() : null;
+        el.addEventListener('click', (e) => {
+          try {
+            let currentValue = this.evalExpr(expression, ctx);
+            currentValue = !!currentValue; // converti in booleano
+            state[expression] = !currentValue;
+            setTimeout(() => window.ayisha?.render(), 0);
+            if (done) done();
+          } catch (err) {
+            this.showError(el, err, expression);
+            if (done) done();
+          }
+        });
+        return true;
+      }
+      return false;
+    }
+  }
+
   class FetchDirective extends Directive {
     constructor(evaluator, bindingManager, errorHandler, fetchManager) {
       super(evaluator, bindingManager, errorHandler);
@@ -3610,6 +3658,7 @@
     '@class': ClassDirective,
     '@style': StyleDirective,
     '@click': ClickDirective,
+    '@toggle': ToggleDirective,
     '@fetch': FetchDirective,
     '@validate': ValidateDirective,
     '@state': StateDirective,
@@ -3673,6 +3722,7 @@
       this.register('@class', new ClassDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@style', new StyleDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@click', new ClickDirective(this.evaluator, this.bindingManager, this.errorHandler));
+      this.register('@toggle', new ToggleDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@fetch', new FetchDirective(this.evaluator, this.bindingManager, this.errorHandler, this.fetchManager));
       this.register('@validate', new ValidateDirective(this.evaluator, this.bindingManager, this.errorHandler));
       this.register('@state', new StateDirective(this.evaluator, this.bindingManager, this.errorHandler));
