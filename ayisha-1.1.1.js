@@ -366,8 +366,9 @@
       const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
       return matches.filter((v, i, arr) => arr.indexOf(v) === i && !jsGlobals.includes(v));
     }
-    constructor(state) {
+    constructor(state, renderCallback = null) {
       this.state = state;
+      this.renderCallback = renderCallback;
     }
 
     evalExpr(expr, ctx = {}, event) {
@@ -426,7 +427,7 @@
       try {
         if (this.executeMultipleExpressions(processedCode, ctx, event)) {
           if (triggerRender) {
-            setTimeout(() => window.ayisha && window.ayisha.render(), 0);
+            setTimeout(() => this.renderCallback && this.renderCallback(), 0);
           }
           return true;
         }
@@ -436,7 +437,7 @@
         stmt(this.state, ctx || {}, event);
 
         if (triggerRender) {
-          setTimeout(() => window.ayisha && window.ayisha.render(), 0);
+          setTimeout(() => this.renderCallback && this.renderCallback(), 0);
         }
         return true;
       } catch (error) {
@@ -2362,7 +2363,7 @@
           }
           state[varName] = value;
         }
-        setTimeout(() => window.ayisha && window.ayisha.render(), 0);
+        setTimeout(() => this.bindingManager.renderCallback(), 0);
 
         const assignmentRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*([^;]+)/g;
         let match;
@@ -2370,7 +2371,7 @@
           const varName = match[1].trim();
           if (varName in state && ctx[varName] !== undefined && ctx[varName] !== state[varName]) {
             state[varName] = ctx[varName];
-            setTimeout(() => window.ayisha && window.ayisha.render(), 0);
+            setTimeout(() => this.bindingManager.renderCallback(), 0);
           }
         }
 
@@ -2426,7 +2427,7 @@
         targetObj[propName] = this.evalExpr(valueExpr, ctx);
       }
 
-      setTimeout(() => window.ayisha?.render(), 0);
+      setTimeout(() => this.bindingManager.renderCallback(), 0);
       return true;
     }
 
@@ -2446,7 +2447,7 @@
               const valueExpr = operation.substring(1).trim();
               state[stateKey][index][propName] = this.evalExpr(valueExpr, ctx);
             }
-            setTimeout(() => window.ayisha?.render(), 0);
+            setTimeout(() => this.bindingManager.renderCallback(), 0);
             return true;
           }
         }
@@ -2472,7 +2473,7 @@
 
         if (objectToDelete?.id) {
           state[targetVar] = state[targetVar].filter(p => p.id !== objectToDelete.id);
-          setTimeout(() => window.ayisha?.render(), 0);
+          setTimeout(() => this.bindingManager.renderCallback(), 0);
           return true;
         }
       }
@@ -2482,13 +2483,13 @@
     handleIncrement(varName, state) {
       if (!(varName in state)) state[varName] = 0;
       state[varName] = (Number(state[varName]) || 0) + 1;
-      setTimeout(() => window.ayisha?.render(), 0);
+      setTimeout(() => this.bindingManager.renderCallback(), 0);
       return true;
     }
 
     handleDecrement(varName, state) {
       state[varName] = (Number(state[varName]) || 0) - 1;
-      setTimeout(() => window.ayisha?.render(), 0);
+      setTimeout(() => this.bindingManager.renderCallback(), 0);
       return true;
     }
 
@@ -2503,7 +2504,7 @@
         case '/': state[varName] = operandValue !== 0 ? currentValue / operandValue : currentValue; break;
       }
 
-      setTimeout(() => window.ayisha?.render(), 0);
+      setTimeout(() => this.bindingManager.renderCallback(), 0);
       return true;
     }
 
@@ -2525,18 +2526,20 @@
       const expr = vNode.directives['@toggle'];
       if (!expr) return;
 
-      if (ayisha_isSimpleIdentifier(expr)) {
-        this.evaluator.ensureVarInState(expr);
+      const processedExpr = expr.replace(/\bstate\./g, '');
+
+      if (ayisha_isSimpleIdentifier(processedExpr)) {
+        this.evaluator.ensureVarInState(processedExpr);
       }
 
       const done = completionListener ? completionListener.addAsyncTask() : null;
 
       el.addEventListener('click', (e) => {
         try {
-          let currentValue = this.evalExpr(expr, ctx);
+          let currentValue = this.evalExpr(processedExpr, ctx);
           currentValue = !!currentValue; 
-          state[expr] = !currentValue;
-          setTimeout(() => window.ayisha?.render(), 0);
+          state[processedExpr] = !currentValue;
+          setTimeout(() => this.bindingManager.renderCallback(), 0);
           if (done) done();
         } catch (err) {
           this.showError(el, err, expr);
@@ -2551,9 +2554,9 @@
         el.addEventListener('click', (e) => {
           try {
             let currentValue = this.evalExpr(expression, ctx);
-            currentValue = !!currentValue; // converti in booleano
+            currentValue = !!currentValue; 
             state[expression] = !currentValue;
-            setTimeout(() => window.ayisha?.render(), 0);
+            setTimeout(() => this.bindingManager.renderCallback(), 0);
             if (done) done();
           } catch (err) {
             this.showError(el, err, expression);
@@ -3206,8 +3209,8 @@
           window.dispatchEvent(new PopStateEvent('popstate'));
         }
 
-        if (typeof window.ayisha?.render === 'function') {
-          setTimeout(() => window.ayisha.render(), 0);
+        if (true) { // render is always available through bindingManager
+          setTimeout(() => this.bindingManager.renderCallback(), 0);
         }
       }
 
@@ -3399,7 +3402,7 @@
             window.ayisha?._processComponentInitBlocks(tempDiv);
             if (!window.ayisha?._isRendering) {
               clearTimeout(window.ayisha?._componentRenderTimeout);
-              window.ayisha._componentRenderTimeout = setTimeout(() => window.ayisha.render(), 10);
+              window.ayisha._componentRenderTimeout = setTimeout(() => window.ayisha.renderManager.render(), 10);
             }
           } else {
             console.error(`ComponentManager: Failed to load component ${srcUrl}`);
@@ -3409,7 +3412,7 @@
           cm.cache[srcUrl] = `<div class='component-error' style='padding: 10px; background: #ffe6e6; border: 1px solid #ff6b6b; border-radius: 4px; color: #d32f2f;'>Errore: ${err.message}</div>`;
           if (!window.ayisha?._isRendering) {
             clearTimeout(window.ayisha?._componentRenderTimeout);
-            window.ayisha._componentRenderTimeout = setTimeout(() => window.ayisha.render(), 10);
+            window.ayisha._componentRenderTimeout = setTimeout(() => window.ayisha.renderManager.render(), 10);
           }
         });
 
@@ -3582,8 +3585,8 @@
             window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
           }, 10);
 
-          if (typeof window.ayisha?.render === 'function') {
-            setTimeout(() => window.ayisha.render(), 0);
+          if (true) { // render is always available through bindingManager
+            setTimeout(() => this.bindingManager.renderCallback(), 0);
           }
 
           if (done) done();
@@ -4607,7 +4610,7 @@
 
       
 
-      this.evaluator = new ExpressionEvaluator(this.state);
+      this.evaluator = new ExpressionEvaluator(this.state, () => this.renderManager.render());
       this.parser = new DOMParser(this._initBlocks);
       this.componentManager = new ComponentManager();
       this.reactivitySystem = new ReactivitySystem(this.state, () => this.renderManager.render());

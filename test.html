@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ayisha.js Examples</title>
-    <script src="/ayisha-1.0.2.js"></script>
+    <script src="/ayisha-1.1.1.js"></script>
     <style>
         * {
             margin: 0;
@@ -471,6 +471,10 @@
         </init>
 
         <button @click="state.showBox = !state.showBox" class="primary">
+            Toggle Box
+        </button>
+
+         <button @toggle="state.showBox" class="primary">
             Toggle Box
         </button>
 
