@@ -4583,7 +4583,7 @@
       return element;
     }
 
-    static version = "1.1.1";
+    static version = "1.1.2";
 
     constructor(root = document.body, options = {}) {
       this.options = {
@@ -4610,12 +4610,12 @@
       this.evaluator = new ExpressionEvaluator(this.state);
       this.parser = new DOMParser(this._initBlocks);
       this.componentManager = new ComponentManager();
-      this.reactivitySystem = new ReactivitySystem(this.state, () => this.render());
-      this.router = new Router(this.state, () => this.render());
+      this.reactivitySystem = new ReactivitySystem(this.state, () => this.renderManager.render());
+      this.router = new Router(this.state, () => this.renderManager.render());
       this.fetchManager = new FetchManager(this.evaluator);
       this.helpSystem = new DirectiveHelpSystem();
       this.errorHandler = new ErrorHandler(this.errorBus);
-      this.bindingManager = new BindingManager(this.evaluator, () => this.render());
+      this.bindingManager = new BindingManager(this.evaluator, () => this.renderManager.render());
       this.centralLogger = new CentralLogger();
       this.centralLogger.initializeLoggers(this.evaluator, this.fetchManager, this.componentManager);
 
@@ -4625,6 +4625,10 @@
         this.errorHandler,
         this.fetchManager
       );
+
+      this.stateManager = new StateManager(this);
+      this.lifecycleManager = new LifecycleManager(this);
+      this.renderManager = new RenderManager(this);
 
       if (!('_currentPage' in this.state) || !this.state._currentPage) {
         let firstPage = null;
@@ -4668,153 +4672,11 @@
       return this.parser.parse(node);
     }
 
-    _runInitBlocks() {
-      if (this._isRendering) {
-        return;
-      }
 
-      this._initBlocks.forEach(code => {
-        if (!code || !code.trim()) {
-          return;
-        }
-        let cleanCode = code.trim()
-          .replace(/[\u200B-\u200D\uFEFF]/g, '')
-          .replace(/\r\n/g, '\n')
-          .replace(/\r/g, '\n')
-          .replace(/\n\s*\n/g, '\n')
-          .replace(/\n\s+/g, '\n')
-          .trim();
 
-        let transformed = cleanCode;
 
-        const lines = transformed.split('\n');
-        const transformedLines = lines.map(line => {
-          const trimmedLine = line.trim();
 
-          if (!trimmedLine ||
-            trimmedLine.startsWith('function') ||
-            trimmedLine.includes('function(') ||
-            trimmedLine.includes('=>') ||
-            /^(if|else|for|while|switch|case|default|try|catch|finally|return|var|let|const)\b/.test(trimmedLine)) {
-            return line;
-          }
 
-          const assignmentMatch = trimmedLine.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$/);
-          if (assignmentMatch &&
-            !trimmedLine.includes('state.') &&
-            !trimmedLine.includes('this.') &&
-            !trimmedLine.includes('window.') &&
-            !trimmedLine.includes('console.') &&
-            !trimmedLine.includes('localStorage.') &&
-            !trimmedLine.includes('sessionStorage.')) {
-            const [, varName, value] = assignmentMatch;
-            const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
-            if (!jsGlobals.includes(varName)) {
-              return line.replace(assignmentMatch[0], `state.${varName} = ${value}`);
-            }
-          }
-
-          return line;
-        });
-
-        transformed = transformedLines.join('\n');
-
-        try {
-          const initFn = ExpressionCompiler.compileStmt(transformed);
-          initFn(this.state);
-        } catch (e) {
-          console.error('Init error:', e);
-        }
-      });
-
-      const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
-
-      jsGlobals.forEach(globalName => {
-        if (globalName in this.state) {
-          delete this.state[globalName];
-        }
-      });
-
-      const stateKeys = Object.keys(this.state);
-      stateKeys.forEach(key => {
-        if (/[+\-*\/=<>!&|(){}[\].,\s]|=>|==|!=|<=|>=|\|\||&&/.test(key)) {
-          delete this.state[key];
-        }
-      });
-
-      const essentialVars = ['_validate', '_currentPage', '_version', '_locale'];
-      essentialVars.forEach(varName => {
-        if (!(varName in this.state)) {
-          if (varName === '_validate') this.state[varName] = {};
-          else if (varName === '_currentPage') this.state[varName] = '';
-          else if (varName === '_version') this.state[varName] = AyishaVDOM.version;
-          else if (varName === '_locale') {
-            this.state[varName] = typeof navigator !== 'undefined' 
-              ? (navigator.language || navigator.userLanguage || 'en')
-              : 'en';
-          }
-        }
-      });
-
-      if ('_ayishaInstance' in this.state) {
-        delete this.state._ayishaInstance;
-      }
-
-      const stateKeysToRemove = Object.keys(this.state).filter(key => {
-        return key.includes('=') || key.includes('<') || key.includes('>') ||
-          key.includes('!') || key.includes('&') || key.includes('|') ||
-          key.includes("'") || key.includes('"') || key.includes('(') || key.includes(')') ||
-          key.includes(' ');
-      });
-      stateKeysToRemove.forEach(key => {
-        console.warn(`Removing invalid state variable: "${key}"`);
-        delete this.state[key];
-      });
-    }
-
-    _preInitializeEssentialVariables() {
-      if (!this.state._validate) this.state._validate = {};
-      if (!this.state._currentPage) this.state._currentPage = '';
-      if (!this.state._version) this.state._version = AyishaVDOM.version;
-      if (!this.state._locale) {
-        this.state._locale = typeof navigator !== 'undefined' 
-          ? (navigator.language || navigator.userLanguage || 'en')
-          : 'en';
-      }
-
-      if ('_ayishaInstance' in this.state) {
-        delete this.state._ayishaInstance;
-      }
-
-      const getBreakpoint = (w) => {
-        if (w < 576) return 'xs';
-        if (w < 768) return 'sm';
-        if (w < 992) return 'md';
-        if (w < 1200) return 'lg';
-        if (w < 1400) return 'xl';
-        return 'xxl';
-      };
-      const updateScreenVars = () => {
-        if (typeof window !== 'undefined') {
-          this.state._currentBreakpoint = getBreakpoint(window.innerWidth);
-          this.state._screenSize = window.innerWidth;
-        } else {
-          this.state._currentBreakpoint = 'lg';
-          this.state._screenSize = 1200;
-        }
-      };
-      updateScreenVars();
-      if (!this._breakpointListenerAdded && typeof window !== 'undefined') {
-        window.addEventListener('resize', updateScreenVars);
-        this._breakpointListenerAdded = true;
-      }
-    }
-
-    _makeReactive() {
-      this.state = this.reactivitySystem.makeReactive();
-      this.evaluator.state = this.state;
-      this.fetchManager.evaluator.state = this.state;
-    }
 
     _setupRouting() {
       this.router.setupRouting();
@@ -4875,429 +4737,6 @@
       }
     }
 
-    render() {
-      if (this._isRendering) return;
-      this._isRendering = true;
-
-      if ('_ayishaInstance' in this.state) {
-        delete this.state._ayishaInstance;
-      }
-
-      const stateKeysToRemove = Object.keys(this.state).filter(key => {
-        return key.includes('=') || key.includes('<') || key.includes('>') ||
-          key.includes('!') || key.includes('&') || key.includes('|') ||
-          key.includes("'") || key.includes('"') || key.includes('(') || key.includes(')') ||
-          key.includes(' ') || key.includes('+') || key.includes('-') || key.includes('*') ||
-          key.includes('/') || key.includes('%') || key.includes('[') || key.includes(']') ||
-          key.includes('{') || key.includes('}') || key.includes('?') || key.includes(':') ||
-          key.includes(';') || key.includes(',') || !(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key));
-      });
-
-      if (stateKeysToRemove.length > 0) {
-        console.warn(`🧹 Cleaning up ${stateKeysToRemove.length} invalid state variables:`, stateKeysToRemove);
-        stateKeysToRemove.forEach(key => {
-          delete this.state[key];
-        });
-      }
-
-      const scrollX = window.scrollX, scrollY = window.scrollY;
-      const active = document.activeElement;
-      let focusInfo = null;
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-        const path = [];
-        let node = active;
-        while (node && node !== this.root) {
-          const parent = node.parentNode;
-          path.unshift([...parent.childNodes].indexOf(node));
-          node = parent;
-        }
-        focusInfo = { path, start: active.selectionStart, end: active.selectionEnd, type: active.type };
-      }
-
-      this.bindingManager.clearBindings();
-      const real = this._renderVNode(this._vdom, this.state);
-
-      if (this.root === document.body) {
-        document.body.innerHTML = '';
-        if (real) {
-          if (real.tagName === undefined && real.childNodes) {
-            Array.from(real.childNodes).forEach(child => document.body.appendChild(child));
-          } else if (real instanceof DocumentFragment) {
-            document.body.appendChild(real);
-          } else {
-            document.body.appendChild(real);
-          }
-        }
-      } else {
-        this.root.innerHTML = '';
-        if (real) {
-          if (real.tagName === undefined && real.childNodes) {
-            Array.from(real.childNodes).forEach(child => this.root.appendChild(child));
-          } else if (real instanceof DocumentFragment) {
-            this.root.appendChild(real);
-          } else {
-            this.root.appendChild(real);
-          }
-        }
-      }
-
-      if (focusInfo) {
-        let node = this.root;
-        for (const i of focusInfo.path) {
-          if (!node || !node.childNodes || !node.childNodes[i]) {
-            node = undefined;
-            break;
-          }
-          node = node.childNodes[i];
-        }
-        if (node && (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA')) {
-          node.focus();
-          try {
-            if ((node.tagName === 'INPUT' && typeof node.selectionStart === 'number' && typeof node.setSelectionRange === 'function' && node.type !== 'number') || node.tagName === 'TEXTAREA') {
-              node.setSelectionRange(focusInfo.start, focusInfo.end);
-            }
-          } catch (e) { }
-        }
-      }
-
-      this._addLogIndicators();
-
-      window.scrollTo(scrollX, scrollY);
-      this.bindingManager.updateBindings();
-
-      if (this._whenDirectiveWatchers) {
-        this._whenDirectiveWatchers.forEach(fn => { try { fn(); } catch { } });
-      }
-
-      this._isRendering = false;
-    }
-
-
-    _addLogIndicators() {
-      const logElements = this.root.querySelectorAll('[data-ayisha-log="true"]');
-
-      logElements.forEach(el => {
-        const existingLog = el.nextElementSibling;
-        if (existingLog && existingLog.classList.contains('ayisha-log-display')) {
-          existingLog.remove();
-        }
-
-        try {
-          const savedDirectiveInfo = JSON.parse(el.getAttribute('data-ayisha-log-info') || '{}');
-
-          const logDisplay = document.createElement('div');
-          logDisplay.className = 'ayisha-log-display';
-          logDisplay.style.cssText = `
-            background: rgba(0, 20, 40, 0.95) !important;
-            color: #fff !important;
-            padding: 8px 12px !important;
-            margin: 4px 0 !important;
-            border-radius: 6px !important;
-            font-family: 'JetBrains Mono', 'Courier New', monospace !important;
-            font-size: 11px !important;
-            border-left: 4px solid #0066cc !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-            max-width: 400px !important;
-            overflow-x: auto !important;
-            line-height: 1.4 !important;
-          `;
-
-          const logContent = this._generateInlineLogContent(el, savedDirectiveInfo);
-          logDisplay.innerHTML = logContent;
-
-          if (el.parentNode) {
-            el.parentNode.insertBefore(logDisplay, el.nextSibling);
-          }
-
-        } catch (error) {
-          console.error('❌ Error creating log display:', error);
-        }
-      });
-
-      const logErrorElements = this.root.querySelectorAll('[data-ayisha-log-error]');
-
-      logErrorElements.forEach(el => {
-        const errorMessage = el.getAttribute('data-ayisha-log-error');
-
-        const errorDisplay = document.createElement('div');
-        errorDisplay.className = 'ayisha-log-error-display';
-        errorDisplay.style.cssText = `
-          background: rgba(255, 0, 0, 0.9) !important;
-          color: white !important;
-          padding: 8px 12px !important;
-          margin: 4px 0 !important;
-          border-radius: 6px !important;
-          font-family: monospace !important;
-          font-size: 11px !important;
-          font-weight: bold !important;
-          display: block !important;
-        `;
-        errorDisplay.innerHTML = `❌ Log Error: ${errorMessage}`;
-
-        if (el.parentNode) {
-          el.parentNode.insertBefore(errorDisplay, el.nextSibling);
-        }
-      });
-    }
-
-    _generateInlineLogContent(el, savedDirectiveInfo) {
-      const vNode = {
-        tag: savedDirectiveInfo.tag || el.tagName.toLowerCase(),
-        directives: savedDirectiveInfo.directives || {},
-        subDirectives: savedDirectiveInfo.subDirectives || {}
-      };
-
-      const ctx = {};
-
-      let html = `<div style="color: #66ccff; font-weight: bold; margin-bottom: 6px;">📊 &lt;${vNode.tag}&gt;</div>`;
-
-      let hasTrackedDirectives = false;
-      let directiveCount = 0;
-
-      Object.keys(vNode.directives).forEach(directive => {
-        if (directive === '@log') return;
-
-        directiveCount++;
-
-        if (this.centralLogger.loggers[directive]) {
-          hasTrackedDirectives = true;
-          try {
-            const logData = this.centralLogger.loggers[directive].log(vNode, ctx, this.state);
-            html += this._formatDirectiveLog(directive, logData.data);
-          } catch (error) {
-            html += `<div style="color: #ff6b6b; margin: 2px 0;">
-              <span style="color: #ff9999;">${directive}</span>: 
-              <span style="color: #ffcccc;">❌ ${error.message}</span>
-            </div>`;
-          }
-        } else {
-          html += `<div style="color: #999; margin: 2px 0;">
-            <span style="color: #ccc;">${directive}</span>: 
-            <span style="color: #aaa;">${this._truncateValue(vNode.directives[directive])}</span>
-            <span style="color: #777; font-size: 10px;"> [untracked]</span>
-          </div>`;
-        }
-      });
-
-      Object.entries(vNode.subDirectives || {}).forEach(([directive, events]) => {
-        Object.keys(events).forEach(event => {
-          directiveCount++;
-          const fullDirective = `${directive}:${event}`;
-          if (this.centralLogger.loggers[directive]) {
-            hasTrackedDirectives = true;
-            try {
-              const logData = this.centralLogger.loggers[directive].log(vNode, ctx, this.state);
-              html += this._formatDirectiveLog(fullDirective, logData.data, true);
-            } catch (error) {
-              html += `<div style="color: #ff6b6b; margin: 2px 0;">
-                <span style="color: #ff9999;">${fullDirective}</span>: 
-                <span style="color: #ffcccc;">❌ ${error.message}</span>
-              </div>`;
-            }
-          } else {
-            html += `<div style="color: #999; margin: 2px 0;">
-              <span style="color: #ccc;">${fullDirective}</span>: 
-              <span style="color: #aaa;">${this._truncateValue(events[event])}</span>
-              <span style="color: #777; font-size: 10px;"> [untracked]</span>
-            </div>`;
-          }
-        });
-      });
-
-      if (directiveCount === 0) {
-        html += `<div style="color: #ff9966; font-style: italic; margin: 4px 0;">
-          ⚠️ Element has @log but no other directives
-        </div>`;
-      } else if (!hasTrackedDirectives) {
-        html += `<div style="color: #ffa726; font-style: italic; margin: 4px 0;">
-          Found ${directiveCount} directive(s) but none are tracked by loggers
-        </div>`;
-      }
-
-      if (savedDirectiveInfo.elementInfo) {
-        const info = savedDirectiveInfo.elementInfo;
-        if (info.className || info.id) {
-          html += `<div style="color: #666; font-size: 10px; margin-top: 4px; padding-top: 2px; border-top: 1px solid #333;">
-            ${info.className ? `Class: ${info.className}` : ''}${info.className && info.id ? ' | ' : ''}${info.id ? `ID: ${info.id}` : ''}
-          </div>`;
-        }
-      }
-
-      html += `<div style="color: #666; font-size: 10px; margin-top: 4px; border-top: 1px solid #333; padding-top: 2px;">
-        ${new Date().toLocaleTimeString()}
-      </div>`;
-
-      return html;
-    }
-
-    _formatDirectiveLog(directiveType, data, isSubDirective = false) {
-      const icon = isSubDirective ? '📎' : '📋';
-      const color = this._getDirectiveColor(directiveType.split(':')[0]);
-
-      let html = `<div style="margin: 4px 0; padding: 4px; background: rgba(255,255,255,0.03); border-radius: 3px;">`;
-      html += `<div style="color: ${color}; font-weight: bold; font-size: 11px; margin-bottom: 2px;">
-        ${icon} ${directiveType}
-      </div>`;
-
-      if (!data) {
-        html += `<div style="color: #999;">No data available</div>`;
-        html += `</div>`;
-        return html;
-      }
-
-      switch (directiveType.split(':')[0]) {
-        case '@for':
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Array: <strong style="color: #ffcc66;">${data.arrayVariable || 'unknown'}</strong> (${data.length || 0} items)<br>
-            Status: <span style="color: ${this._getStatusColor(data.status)};">${data.status || 'unknown'}</span><br>
-            Item var: <span style="color: #66ccff;">${data.itemVariable || 'unknown'}</span>
-            ${data.indexVariable ? `, Index var: <span style="color: #66ccff;">${data.indexVariable}</span>` : ''}
-          </div>`;
-          break;
-
-        case '@fetch':
-          const url = data.url || '';
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            URL: <strong style="color: #66ff66;">${url.slice(0, 35)}${url.length > 35 ? '...' : ''}</strong><br>
-            Result var: <span style="color: #ffcc66;">${data.resultVariable || 'result'}</span><br>
-            Status: <span style="color: ${this._getStatusColor(data.status)};">${data.status || 'unknown'}</span><br>
-            Size: <span style="color: #ccc;">${data.responseSize || 'N/A'}</span>
-          </div>`;
-          break;
-
-        case '@model':
-          const value = data.currentValue;
-          const displayValue = typeof value === 'string'
-            ? `"${value.slice(0, 20)}${value.length > 20 ? '...' : ''}"`
-            : JSON.stringify(value);
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Variable: <strong style="color: #66ccff;">${data.variable || 'unknown'}</strong><br>
-            Value: <span style="color: #ffcc66;">${displayValue}</span> 
-            <span style="color: #999;">(${data.valueType})</span><br>
-            ${data.validation ? `Validation: <span style="color: ${this._getStatusColor(data.validation.status)};">${data.validation.status}</span>` : 'No validation'}
-          </div>`;
-          break;
-
-        case '@if':
-        case '@show':
-        case '@hide':
-          const condition = data.condition || '';
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Condition: <strong style="color: #ffcc66;">${condition.slice(0, 25)}${condition.length > 25 ? '...' : ''}</strong><br>
-            Result: <span style="color: #66ccff;">${data.result}</span> → 
-            <span style="color: ${data.isVisible ? '#66bb6a' : '#ff6b6b'};">${data.isVisible ? 'Visible' : 'Hidden'}</span>
-          </div>`;
-          break;
-
-        case '@click':
-          const action = data.action || '';
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Action: <strong style="color: #ffcc66;">${action.slice(0, 25)}${action.length > 25 ? '...' : ''}</strong><br>
-            Clicks: <span style="color: #66ccff;">${data.clickCount || 0}</span><br>
-            Last: <span style="color: #999;">${data.lastClick || 'Never'}</span>
-          </div>`;
-          break;
-
-        case '@component':
-          const source = data.source || '';
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Source: <strong style="color: #66ccff;">${source.slice(0, 30)}${source.length > 30 ? '...' : ''}</strong><br>
-            Status: <span style="color: ${this._getStatusColor(data.status)};">${data.status || 'unknown'}</span><br>
-            Cached: <span style="color: ${data.cached ? '#66bb6a' : '#ff9800'};">${data.cached ? 'Yes' : 'No'}</span>
-          </div>`;
-          break;
-
-        case '@input':
-          const inputAction = data.action || '';
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Action: <strong style="color: #ffcc66;">${inputAction.slice(0, 25)}${inputAction.length > 25 ? '...' : ''}</strong><br>
-            Inputs: <span style="color: #66ccff;">${data.inputCount || 0}</span><br>
-            Last: <span style="color: #999;">${data.lastInput || 'Never'}</span>
-          </div>`;
-          break;
-
-        case '@focus':
-          const focusAction = data.action || '';
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Action: <strong style="color: #ffcc66;">${focusAction.slice(0, 25)}${focusAction.length > 25 ? '...' : ''}</strong><br>
-            Focus events: <span style="color: #66ccff;">${data.focusCount || 0}</span><br>
-            Last: <span style="color: #999;">${data.lastFocus || 'Never'}</span>
-          </div>`;
-          break;
-
-        case '@blur':
-          const blurAction = data.action || '';
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Action: <strong style="color: #ffcc66;">${blurAction.slice(0, 25)}${blurAction.length > 25 ? '...' : ''}</strong><br>
-            Blur events: <span style="color: #66ccff;">${data.blurCount || 0}</span><br>
-            Last: <span style="color: #999;">${data.lastBlur || 'Never'}</span>
-          </div>`;
-          break;
-
-        case '@change':
-          const changeAction = data.action || '';
-          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
-            Action: <strong style="color: #ffcc66;">${changeAction.slice(0, 25)}${changeAction.length > 25 ? '...' : ''}</strong><br>
-            Change events: <span style="color: #66ccff;">${data.changeCount || 0}</span><br>
-            Last: <span style="color: #999;">${data.lastChange || 'Never'}</span>
-          </div>`;
-          break;
-
-        default:
-          html += `<div style="color: #cccccc; font-size: 10px;">
-            Expression: <span style="color: #ffcc66;">${data.expression || 'N/A'}</span><br>
-            Status: <span style="color: #999;">${data.status || 'unknown'}</span>
-          </div>`;
-      }
-
-      if (data.error) {
-        html += `<div style="color: #ff6b6b; font-size: 9px; margin-top: 2px; padding: 2px; background: rgba(255,0,0,0.1); border-radius: 2px;">
-          💥 ${data.error}
-        </div>`;
-      }
-
-      html += `</div>`;
-      return html;
-    }
-
-    _getDirectiveColor(type) {
-      const colors = {
-        '@for': '#ff9800',
-        '@fetch': '#4caf50',
-        '@model': '#2196f3',
-        '@if': '#9c27b0',
-        '@show': '#9c27b0',
-        '@hide': '#9c27b0',
-        '@click': '#f44336',
-        '@component': '#00bcd4',
-        'generic': '#666666'
-      };
-      return colors[type] || '#666666';
-    }
-
-    _getStatusColor(status) {
-      if (!status) return '#cccccc';
-      if (typeof status === 'string') {
-        if (status.includes('error') || status.includes('❌')) return '#ff6b6b';
-        if (status.includes('loading') || status.includes('⏳')) return '#ffa726';
-        if (status.includes('success') || status.includes('✅')) return '#66bb6a';
-      }
-      return '#cccccc';
-    }
-
-    _getStatusIcon(status) {
-      if (!status) return '📊';
-      if (status === 'error') return '❌';
-      if (status === 'loading') return '⏳';
-      if (status === 'success') return '✅';
-      if (status === 'unknown') return '❓';
-      return '📊';
-    }
-
-    _truncateValue(value, maxLength = 30) {
-      if (typeof value !== 'string') value = String(value);
-      return value.length > maxLength ? value.slice(0, maxLength) + '...' : value;
-    }
 
     _renderVNode(vNode, ctx) {
       if (!vNode) return null;
@@ -5861,45 +5300,26 @@
         if (firstPage) this.state._currentPage = firstPage.directives['@page'];
       }
 
-      this._preInitializeEssentialVariables();
-      this._makeReactive();
-      this._runInitBlocks();
+      this.stateManager.preInitializeEssentialVariables();
+      this.stateManager.makeReactive();
+      this.stateManager.runInitBlocks();
       this.reactivitySystem.enableWatchers();
       this._setupRouting();
       this.router.setupCurrentPageProperty();
 
-      this.preloadComponents().then(() => {
+      this.lifecycleManager.preloadComponents().then(() => {
         if (!this._isRendering) {
-          this.render();
+          this.renderManager.render();
         }
       });
 
-      this.render();
+      this.renderManager.render();
 
-      this.root.addEventListener('click', e => {
-        let el = e.target;
-        while (el && el !== this.root) {
-          if (el.hasAttribute('@link')) {
-            e.preventDefault();
-            const targetPage = el.getAttribute('@link');
-
-            let finalPage = targetPage;
-            if (targetPage.startsWith('/')) {
-              finalPage = targetPage.substring(1);
-            }
-
-            this.state._currentPage = finalPage;
-            this.render();
-            return;
-          }
-          el = el.parentNode;
-        }
-      }, true);
+      this.lifecycleManager.setupEventListeners();
     }
 
     
   }
-
 
   const addDefaultAnimationStyles = () => {
     if (typeof document === 'undefined') return; 
@@ -5968,6 +5388,665 @@
     } else {
       addDefaultAnimationStyles();
       new AyishaVDOM(document.body).mount();
+    }
+  }
+
+  class RenderManager {
+    constructor(ayishaInstance) {
+      this.ayisha = ayishaInstance;
+    }
+
+    render() {
+      if (this.ayisha._isRendering) return;
+      this.ayisha._isRendering = true;
+
+      if ('_ayishaInstance' in this.ayisha.state) {
+        delete this.ayisha.state._ayishaInstance;
+      }
+
+      this.ayisha.stateManager.cleanState();
+
+      const scrollX = window.scrollX, scrollY = window.scrollY;
+      const active = document.activeElement;
+      let focusInfo = null;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        const path = [];
+        let node = active;
+        while (node && node !== this.ayisha.root) {
+          const parent = node.parentNode;
+          path.unshift([...parent.childNodes].indexOf(node));
+          node = parent;
+        }
+        focusInfo = { path, start: active.selectionStart, end: active.selectionEnd, type: active.type };
+      }
+
+      this.ayisha.bindingManager.clearBindings();
+      const real = this.ayisha._renderVNode(this.ayisha._vdom, this.ayisha.state);
+
+      if (this.ayisha.root === document.body) {
+        document.body.innerHTML = '';
+        if (real) {
+          if (real.tagName === undefined && real.childNodes) {
+            Array.from(real.childNodes).forEach(child => document.body.appendChild(child));
+          } else if (real instanceof DocumentFragment) {
+            document.body.appendChild(real);
+          } else {
+            document.body.appendChild(real);
+          }
+        }
+      } else {
+        this.ayisha.root.innerHTML = '';
+        if (real) {
+          if (real.tagName === undefined && real.childNodes) {
+            Array.from(real.childNodes).forEach(child => this.ayisha.root.appendChild(child));
+          } else if (real instanceof DocumentFragment) {
+            this.ayisha.root.appendChild(real);
+          } else {
+            this.ayisha.root.appendChild(real);
+          }
+        }
+      }
+
+      if (focusInfo) {
+        let node = this.ayisha.root;
+        for (const i of focusInfo.path) {
+          if (!node || !node.childNodes || !node.childNodes[i]) {
+            node = undefined;
+            break;
+          }
+          node = node.childNodes[i];
+        }
+        if (node && (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA')) {
+          node.focus();
+          try {
+            if ((node.tagName === 'INPUT' && typeof node.selectionStart === 'number' && typeof node.setSelectionRange === 'function' && node.type !== 'number') || node.tagName === 'TEXTAREA') {
+              node.setSelectionRange(focusInfo.start, focusInfo.end);
+            }
+          } catch (e) { }
+        }
+      }
+
+      this._addLogIndicators();
+
+      window.scrollTo(scrollX, scrollY);
+      this.ayisha.bindingManager.updateBindings();
+
+      if (this.ayisha._whenDirectiveWatchers) {
+        this.ayisha._whenDirectiveWatchers.forEach(fn => { try { fn(); } catch { } });
+      }
+
+      this.ayisha._isRendering = false;
+    }
+
+    _addLogIndicators() {
+      const logElements = this.ayisha.root.querySelectorAll('[data-ayisha-log="true"]');
+
+      logElements.forEach(el => {
+        const existingLog = el.nextElementSibling;
+        if (existingLog && existingLog.classList.contains('ayisha-log-display')) {
+          existingLog.remove();
+        }
+
+        try {
+          const savedDirectiveInfo = JSON.parse(el.getAttribute('data-ayisha-log-info') || '{}');
+
+          const logDisplay = document.createElement('div');
+          logDisplay.className = 'ayisha-log-display';
+          logDisplay.style.cssText = `
+            background: rgba(0, 20, 40, 0.95) !important;
+            color: #fff !important;
+            padding: 8px 12px !important;
+            margin: 4px 0 !important;
+            border-radius: 6px !important;
+            font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+            font-size: 11px !important;
+            border-left: 4px solid #0066cc !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+            max-width: 400px !important;
+            overflow-x: auto !important;
+            line-height: 1.4 !important;
+          `;
+
+          const logContent = this._generateInlineLogContent(el, savedDirectiveInfo);
+          logDisplay.innerHTML = logContent;
+
+          if (el.parentNode) {
+            el.parentNode.insertBefore(logDisplay, el.nextSibling);
+          }
+
+        } catch (error) {
+          console.error('❌ Error creating log display:', error);
+        }
+      });
+
+      const logErrorElements = this.ayisha.root.querySelectorAll('[data-ayisha-log-error]');
+
+      logErrorElements.forEach(el => {
+        const errorMessage = el.getAttribute('data-ayisha-log-error');
+
+        const errorDisplay = document.createElement('div');
+        errorDisplay.className = 'ayisha-log-error-display';
+        errorDisplay.style.cssText = `
+          background: rgba(255, 0, 0, 0.9) !important;
+          color: white !important;
+          padding: 8px 12px !important;
+          margin: 4px 0 !important;
+          border-radius: 6px !important;
+          font-family: monospace !important;
+          font-size: 11px !important;
+          font-weight: bold !important;
+          display: block !important;
+        `;
+        errorDisplay.innerHTML = `❌ Log Error: ${errorMessage}`;
+
+        if (el.parentNode) {
+          el.parentNode.insertBefore(errorDisplay, el.nextSibling);
+        }
+      });
+    }
+
+    _generateInlineLogContent(el, savedDirectiveInfo) {
+      const vNode = {
+        tag: savedDirectiveInfo.tag || el.tagName.toLowerCase(),
+        directives: savedDirectiveInfo.directives || {},
+        subDirectives: savedDirectiveInfo.subDirectives || {}
+      };
+
+      const ctx = {};
+
+      let html = `<div style="color: #66ccff; font-weight: bold; margin-bottom: 6px;">📊 &lt;${vNode.tag}&gt;</div>`;
+
+      let hasTrackedDirectives = false;
+      let directiveCount = 0;
+
+      Object.keys(vNode.directives).forEach(directive => {
+        if (directive === '@log') return;
+
+        directiveCount++;
+
+        if (this.ayisha.centralLogger.loggers[directive]) {
+          hasTrackedDirectives = true;
+          try {
+            const logData = this.ayisha.centralLogger.loggers[directive].log(vNode, ctx, this.ayisha.state);
+            html += this._formatDirectiveLog(directive, logData.data);
+          } catch (error) {
+            html += `<div style="color: #ff6b6b; margin: 2px 0;">
+              <span style="color: #ff9999;">${directive}</span>: 
+              <span style="color: #ffcccc;">❌ ${error.message}</span>
+            </div>`;
+          }
+        } else {
+          html += `<div style="color: #999; margin: 2px 0;">
+            <span style="color: #ccc;">${directive}</span>: 
+            <span style="color: #aaa;">${this._truncateValue(vNode.directives[directive])}</span>
+            <span style="color: #777; font-size: 10px;"> [untracked]</span>
+          </div>`;
+        }
+      });
+
+      Object.entries(vNode.subDirectives || {}).forEach(([directive, events]) => {
+        Object.keys(events).forEach(event => {
+          directiveCount++;
+          const fullDirective = `${directive}:${event}`;
+          if (this.ayisha.centralLogger.loggers[directive]) {
+            hasTrackedDirectives = true;
+            try {
+              const logData = this.ayisha.centralLogger.loggers[directive].log(vNode, ctx, this.ayisha.state);
+              html += this._formatDirectiveLog(fullDirective, logData.data, true);
+            } catch (error) {
+              html += `<div style="color: #ff6b6b; margin: 2px 0;">
+                <span style="color: #ff9999;">${fullDirective}</span>: 
+                <span style="color: #ffcccc;">❌ ${error.message}</span>
+              </div>`;
+            }
+          } else {
+            html += `<div style="color: #999; margin: 2px 0;">
+              <span style="color: #ccc;">${fullDirective}</span>: 
+              <span style="color: #aaa;">${this._truncateValue(events[event])}</span>
+              <span style="color: #777; font-size: 10px;"> [untracked]</span>
+            </div>`;
+          }
+        });
+      });
+
+      if (directiveCount === 0) {
+        html += `<div style="color: #ff9966; font-style: italic; margin: 4px 0;">
+          ⚠️ Element has @log but no other directives
+        </div>`;
+      } else if (!hasTrackedDirectives) {
+        html += `<div style="color: #ffa726; font-style: italic; margin: 4px 0;">
+          Found ${directiveCount} directive(s) but none are tracked by loggers
+        </div>`;
+      }
+
+      if (savedDirectiveInfo.elementInfo) {
+        const info = savedDirectiveInfo.elementInfo;
+        if (info.className || info.id) {
+          html += `<div style="color: #666; font-size: 10px; margin-top: 4px; padding-top: 2px; border-top: 1px solid #333;">
+            ${info.className ? `Class: ${info.className}` : ''}${info.className && info.id ? ' | ' : ''}${info.id ? `ID: ${info.id}` : ''}
+          </div>`;
+        }
+      }
+
+      html += `<div style="color: #666; font-size: 10px; margin-top: 4px; border-top: 1px solid #333; padding-top: 2px;">
+        ${new Date().toLocaleTimeString()}
+      </div>`;
+
+      return html;
+    }
+
+    _formatDirectiveLog(directiveType, data, isSubDirective = false) {
+      const icon = isSubDirective ? '📎' : '📋';
+      const color = this._getDirectiveColor(directiveType.split(':')[0]);
+
+      let html = `<div style="margin: 4px 0; padding: 4px; background: rgba(255,255,255,0.03); border-radius: 3px;">`;
+      html += `<div style="color: ${color}; font-weight: bold; font-size: 11px; margin-bottom: 2px;">
+        ${icon} ${directiveType}
+      </div>`;
+
+      if (!data) {
+        html += `<div style="color: #999;">No data available</div>`;
+        html += `</div>`;
+        return html;
+      }
+
+      switch (directiveType.split(':')[0]) {
+        case '@for':
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Array: <strong style="color: #ffcc66;">${data.arrayVariable || 'unknown'}</strong> (${data.length || 0} items)<br>
+            Status: <span style="color: ${this._getStatusColor(data.status)};">${data.status || 'unknown'}</span><br>
+            Item var: <span style="color: #66ccff;">${data.itemVariable || 'unknown'}</span>
+            ${data.indexVariable ? `, Index var: <span style="color: #66ccff;">${data.indexVariable}</span>` : ''}
+          </div>`;
+          break;
+
+        case '@fetch':
+          const url = data.url || '';
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            URL: <strong style="color: #66ff66;">${url.slice(0, 35)}${url.length > 35 ? '...' : ''}</strong><br>
+            Result var: <span style="color: #ffcc66;">${data.resultVariable || 'result'}</span><br>
+            Status: <span style="color: ${this._getStatusColor(data.status)};">${data.status || 'unknown'}</span><br>
+            Size: <span style="color: #ccc;">${data.responseSize || 'N/A'}</span>
+          </div>`;
+          break;
+
+        case '@model':
+          const value = data.currentValue;
+          const displayValue = typeof value === 'string'
+            ? `"${value.slice(0, 20)}${value.length > 20 ? '...' : ''}"`
+            : JSON.stringify(value);
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Variable: <strong style="color: #66ccff;">${data.variable || 'unknown'}</strong><br>
+            Value: <span style="color: #ffcc66;">${displayValue}</span> 
+            <span style="color: #999;">(${data.valueType})</span><br>
+            ${data.validation ? `Validation: <span style="color: ${this._getStatusColor(data.validation.status)};">${data.validation.status}</span>` : 'No validation'}
+          </div>`;
+          break;
+
+        case '@if':
+        case '@show':
+        case '@hide':
+          const condition = data.condition || '';
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Condition: <strong style="color: #ffcc66;">${condition.slice(0, 25)}${condition.length > 25 ? '...' : ''}</strong><br>
+            Result: <span style="color: #66ccff;">${data.result}</span> → 
+            <span style="color: ${data.isVisible ? '#66bb6a' : '#ff6b6b'};">${data.isVisible ? 'Visible' : 'Hidden'}</span>
+          </div>`;
+          break;
+
+        case '@click':
+          const action = data.action || '';
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Action: <strong style="color: #ffcc66;">${action.slice(0, 25)}${action.length > 25 ? '...' : ''}</strong><br>
+            Clicks: <span style="color: #66ccff;">${data.clickCount || 0}</span><br>
+            Last: <span style="color: #999;">${data.lastClick || 'Never'}</span>
+          </div>`;
+          break;
+
+        case '@component':
+          const source = data.source || '';
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Source: <strong style="color: #66ccff;">${source.slice(0, 30)}${source.length > 30 ? '...' : ''}</strong><br>
+            Status: <span style="color: ${this._getStatusColor(data.status)};">${data.status || 'unknown'}</span><br>
+            Cached: <span style="color: ${data.cached ? '#66bb6a' : '#ff9800'};">${data.cached ? 'Yes' : 'No'}</span>
+          </div>`;
+          break;
+
+        case '@input':
+          const inputAction = data.action || '';
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Action: <strong style="color: #ffcc66;">${inputAction.slice(0, 25)}${inputAction.length > 25 ? '...' : ''}</strong><br>
+            Inputs: <span style="color: #66ccff;">${data.inputCount || 0}</span><br>
+            Last: <span style="color: #999;">${data.lastInput || 'Never'}</span>
+          </div>`;
+          break;
+
+        case '@focus':
+          const focusAction = data.action || '';
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Action: <strong style="color: #ffcc66;">${focusAction.slice(0, 25)}${focusAction.length > 25 ? '...' : ''}</strong><br>
+            Focus events: <span style="color: #66ccff;">${data.focusCount || 0}</span><br>
+            Last: <span style="color: #999;">${data.lastFocus || 'Never'}</span>
+          </div>`;
+          break;
+
+        case '@blur':
+          const blurAction = data.action || '';
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Action: <strong style="color: #ffcc66;">${blurAction.slice(0, 25)}${blurAction.length > 25 ? '...' : ''}</strong><br>
+            Blur events: <span style="color: #66ccff;">${data.blurCount || 0}</span><br>
+            Last: <span style="color: #999;">${data.lastBlur || 'Never'}</span>
+          </div>`;
+          break;
+
+        case '@change':
+          const changeAction = data.action || '';
+          html += `<div style="color: #cccccc; font-size: 10px; line-height: 1.3;">
+            Action: <strong style="color: #ffcc66;">${changeAction.slice(0, 25)}${changeAction.length > 25 ? '...' : ''}</strong><br>
+            Change events: <span style="color: #66ccff;">${data.changeCount || 0}</span><br>
+            Last: <span style="color: #999;">${data.lastChange || 'Never'}</span>
+          </div>`;
+          break;
+
+        default:
+          html += `<div style="color: #cccccc; font-size: 10px;">
+            Expression: <span style="color: #ffcc66;">${data.expression || 'N/A'}</span><br>
+            Status: <span style="color: #999;">${data.status || 'unknown'}</span>
+          </div>`;
+      }
+
+      if (data.error) {
+        html += `<div style="color: #ff6b6b; font-size: 9px; margin-top: 2px; padding: 2px; background: rgba(255,0,0,0.1); border-radius: 2px;">
+          💥 ${data.error}
+        </div>`;
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    _getDirectiveColor(type) {
+      const colors = {
+        '@for': '#ff9800',
+        '@fetch': '#4caf50',
+        '@model': '#2196f3',
+        '@if': '#9c27b0',
+        '@show': '#9c27b0',
+        '@hide': '#9c27b0',
+        '@click': '#f44336',
+        '@component': '#00bcd4',
+        'generic': '#666666'
+      };
+      return colors[type] || '#666666';
+    }
+
+    _getStatusColor(status) {
+      if (!status) return '#cccccc';
+      if (typeof status === 'string') {
+        if (status.includes('error') || status.includes('❌')) return '#ff6b6b';
+        if (status.includes('loading') || status.includes('⏳')) return '#ffa726';
+        if (status.includes('success') || status.includes('✅')) return '#66bb6a';
+      }
+      return '#cccccc';
+    }
+
+    _getStatusIcon(status) {
+      if (!status) return '📊';
+      if (status === 'error') return '❌';
+      if (status === 'loading') return '⏳';
+      if (status === 'success') return '✅';
+      if (status === 'unknown') return '❓';
+      return '📊';
+    }
+
+    _truncateValue(value, maxLength = 30) {
+      if (typeof value !== 'string') value = String(value);
+      return value.length > maxLength ? value.slice(0, maxLength) + '...' : value;
+    }
+  }
+
+  class LifecycleManager {
+    constructor(ayishaInstance) {
+      this.ayisha = ayishaInstance;
+    }
+
+    async preloadComponents() {
+      const componentPromises = [];
+      const processedUrls = new Set();
+
+      const componentElements = this.ayisha.root.querySelectorAll('component');
+
+      componentElements.forEach(el => {
+        let srcUrl = null;
+
+        if (el.hasAttribute('src')) {
+          srcUrl = el.getAttribute('src');
+        } else if (el.hasAttribute('@src')) {
+          const attrValue = el.getAttribute('@src');
+          if (/^['\"].*['\"]$/.test(attrValue)) {
+            srcUrl = attrValue.slice(1, -1);
+          } else if (attrValue.includes('.html') || attrValue.startsWith('./') || attrValue.startsWith('/')) {
+            srcUrl = attrValue;
+          } else {
+            try {
+              srcUrl = this.ayisha.evaluator.evalExpr(attrValue);
+            } catch (e) {
+              // If eval fails and it looks like a file path, use it directly
+              if (attrValue.includes('.html') || attrValue.startsWith('./') || attrValue.startsWith('/')) {
+                srcUrl = attrValue;
+              }
+            }
+          }
+        }
+
+        if (srcUrl && !processedUrls.has(srcUrl) && !this.ayisha.componentManager.getCachedComponent(srcUrl)) {
+          processedUrls.add(srcUrl);
+          componentPromises.push(this.ayisha.componentManager.loadExternalComponent(srcUrl));
+        }
+      });
+
+      if (componentPromises.length > 0) {
+        try {
+          await Promise.allSettled(componentPromises);
+        } catch (error) {
+          console.error('Error during component preloading:', error);
+        }
+      }
+    }
+
+    setupEventListeners() {
+      this.ayisha.root.addEventListener('click', e => {
+        let el = e.target;
+        while (el && el !== this.ayisha.root) {
+          if (el.hasAttribute('@link')) {
+            e.preventDefault();
+            const targetPage = el.getAttribute('@link');
+
+            let finalPage = targetPage;
+            if (targetPage.startsWith('/')) {
+              finalPage = targetPage.substring(1);
+            }
+
+            this.ayisha.state._currentPage = finalPage;
+            this.ayisha.renderManager.render();
+            return;
+          }
+          el = el.parentNode;
+        }
+      }, true);
+    }
+  }
+
+  class StateManager {
+    constructor(ayishaInstance) {
+      this.ayisha = ayishaInstance;
+    }
+
+    preInitializeEssentialVariables() {
+      if (!this.ayisha.state._validate) this.ayisha.state._validate = {};
+      if (!this.ayisha.state._currentPage) this.ayisha.state._currentPage = '';
+      if (!this.ayisha.state._version) this.ayisha.state._version = AyishaVDOM.version;
+      if (!this.ayisha.state._locale) {
+        this.ayisha.state._locale = typeof navigator !== 'undefined' 
+          ? (navigator.language || navigator.userLanguage || 'en')
+          : 'en';
+      }
+
+      if ('_ayishaInstance' in this.ayisha.state) {
+        delete this.ayisha.state._ayishaInstance;
+      }
+
+      const getBreakpoint = (w) => {
+        if (w < 576) return 'xs';
+        if (w < 768) return 'sm';
+        if (w < 992) return 'md';
+        if (w < 1200) return 'lg';
+        if (w < 1400) return 'xl';
+        return 'xxl';
+      };
+      const updateScreenVars = () => {
+        if (typeof window !== 'undefined') {
+          this.ayisha.state._currentBreakpoint = getBreakpoint(window.innerWidth);
+          this.ayisha.state._screenSize = window.innerWidth;
+        } else {
+          this.ayisha.state._currentBreakpoint = 'lg';
+          this.ayisha.state._screenSize = 1200;
+        }
+      };
+      updateScreenVars();
+      if (!this.ayisha._breakpointListenerAdded && typeof window !== 'undefined') {
+        window.addEventListener('resize', updateScreenVars);
+        this.ayisha._breakpointListenerAdded = true;
+      }
+    }
+
+    makeReactive() {
+      this.ayisha.state = this.ayisha.reactivitySystem.makeReactive();
+      this.ayisha.evaluator.state = this.ayisha.state;
+      this.ayisha.fetchManager.evaluator.state = this.ayisha.state;
+    }
+
+    runInitBlocks() {
+      if (this.ayisha._isRendering) {
+        return;
+      }
+
+      this.ayisha._initBlocks.forEach(code => {
+        if (!code || !code.trim()) {
+          return;
+        }
+        let cleanCode = code.trim()
+          .replace(/[\u200B-\u200D\uFEFF]/g, '')
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          .replace(/\n\s*\n/g, '\n')
+          .replace(/\n\s+/g, '\n')
+          .trim();
+
+        let transformed = cleanCode;
+
+        const lines = transformed.split('\n');
+        const transformedLines = lines.map(line => {
+          const trimmedLine = line.trim();
+
+          if (!trimmedLine ||
+            trimmedLine.startsWith('function') ||
+            trimmedLine.includes('function(') ||
+            trimmedLine.includes('=>') ||
+            /^(if|else|for|while|switch|case|default|try|catch|finally|return|var|let|const)\b/.test(trimmedLine)) {
+            return line;
+          }
+
+          const assignmentMatch = trimmedLine.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$/);
+          if (assignmentMatch &&
+            !trimmedLine.includes('state.') &&
+            !trimmedLine.includes('this.') &&
+            !trimmedLine.includes('window.') &&
+            !trimmedLine.includes('console.') &&
+            !trimmedLine.includes('localStorage.') &&
+            !trimmedLine.includes('sessionStorage.')) {
+            const [, varName, value] = assignmentMatch;
+            const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
+            if (!jsGlobals.includes(varName)) {
+              return line.replace(assignmentMatch[0], `state.${varName} = ${value}`);
+            }
+          }
+
+          return line;
+        });
+
+        transformed = transformedLines.join('\n');
+
+        try {
+          const initFn = ExpressionCompiler.compileStmt(transformed);
+          initFn(this.ayisha.state);
+        } catch (e) {
+          console.error('Init error:', e);
+        }
+      });
+
+      const jsGlobals = AYISHA_CONSTS.JS_GLOBALS;
+
+      jsGlobals.forEach(globalName => {
+        if (globalName in this.ayisha.state) {
+          delete this.ayisha.state[globalName];
+        }
+      });
+
+      const stateKeys = Object.keys(this.ayisha.state);
+      stateKeys.forEach(key => {
+        if (/[+\-*\/=<>!&|(){}[\].,\s]|=>|==|!=|<=|>=|\|\||&&/.test(key)) {
+          delete this.ayisha.state[key];
+        }
+      });
+
+      const essentialVars = ['_validate', '_currentPage', '_version', '_locale'];
+      essentialVars.forEach(varName => {
+        if (!(varName in this.ayisha.state)) {
+          if (varName === '_validate') this.ayisha.state[varName] = {};
+          else if (varName === '_currentPage') this.ayisha.state[varName] = '';
+          else if (varName === '_version') this.ayisha.state[varName] = AyishaVDOM.version;
+          else if (varName === '_locale') {
+            this.ayisha.state[varName] = typeof navigator !== 'undefined' 
+              ? (navigator.language || navigator.userLanguage || 'en')
+              : 'en';
+          }
+        }
+      });
+
+      if ('_ayishaInstance' in this.ayisha.state) {
+        delete this.ayisha.state._ayishaInstance;
+      }
+
+      const stateKeysToRemove = Object.keys(this.ayisha.state).filter(key => {
+        return key.includes('=') || key.includes('<') || key.includes('>') ||
+          key.includes('!') || key.includes('&') || key.includes('|') ||
+          key.includes("'") || key.includes('"') || key.includes('(') || key.includes(')') ||
+          key.includes(' ');
+      });
+      stateKeysToRemove.forEach(key => {
+        console.warn(`Removing invalid state variable: "${key}"`);
+        delete this.ayisha.state[key];
+      });
+    }
+
+    cleanState() {
+      const stateKeysToRemove = Object.keys(this.ayisha.state).filter(key => {
+        return key.includes('=') || key.includes('<') || key.includes('>') ||
+          key.includes('!') || key.includes('&') || key.includes('|') ||
+          key.includes("'") || key.includes('"') || key.includes('(') || key.includes(')') ||
+          key.includes(' ') || key.includes('+') || key.includes('-') || key.includes('*') ||
+          key.includes('/') || key.includes('%') || key.includes('[') || key.includes(']') ||
+          key.includes('{') || key.includes('}') || key.includes('?') || key.includes(':') ||
+          key.includes(';') || key.includes(',') || !(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key));
+      });
+
+      if (stateKeysToRemove.length > 0) {
+        console.warn(`🧹 Cleaning up ${stateKeysToRemove.length} invalid state variables:`, stateKeysToRemove);
+        stateKeysToRemove.forEach(key => {
+          delete this.ayisha.state[key];
+        });
+      }
     }
   }
 
