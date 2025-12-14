@@ -1359,7 +1359,6 @@
       this.evaluator = evaluator;
       this.renderCallback = renderCallback;
       this.modelBindings = [];
-      this.eventListeners = new WeakMap(); // Traccia degli event listeners per cleanup aggressivo
     }
 
     static setNestedValidate(obj, path, value) {
@@ -1490,9 +1489,9 @@
       };
 
       if (el.type === 'checkbox' || el.type === 'radio') {
-        this.addTrackedEventListener(el, 'change', handleInput);
+        el.addEventListener('change', handleInput);
       } else {
-        this.addTrackedEventListener(el, 'input', handleInput);
+        el.addEventListener('input', handleInput);
       }
     }
 
@@ -1655,11 +1654,11 @@
       };
 
       validate();
-      this.addTrackedEventListener(el, 'input', () => {
+      el.addEventListener('input', () => {
         validate();
         this.renderCallback();
       });
-      this.addTrackedEventListener(el, 'blur', validate);
+      el.addEventListener('blur', validate);
     }
 
     updateBindings() {
@@ -1667,45 +1666,7 @@
     }
 
     clearBindings() {
-      // Rimuovi tutti gli event listeners registrati
-      this.eventListeners = new WeakMap();
       this.modelBindings = [];
-    }
-
-    // Metodi helper per gestione aggressiva degli event listeners
-    addTrackedEventListener(el, event, handler, options = {}) {
-      // Rimuovi event listener precedente se esiste
-      this.removeTrackedEventListener(el, event);
-
-      // Registra il nuovo event listener
-      if (!this.eventListeners.has(el)) {
-        this.eventListeners.set(el, new Map());
-      }
-      this.eventListeners.get(el).set(event, handler);
-
-      // Aggiungi l'event listener
-      el.addEventListener(event, handler, options);
-    }
-
-    removeTrackedEventListener(el, event) {
-      if (this.eventListeners.has(el)) {
-        const listeners = this.eventListeners.get(el);
-        if (listeners.has(event)) {
-          const handler = listeners.get(event);
-          el.removeEventListener(event, handler);
-          listeners.delete(event);
-        }
-      }
-    }
-
-    removeAllTrackedEventListeners(el) {
-      if (this.eventListeners.has(el)) {
-        const listeners = this.eventListeners.get(el);
-        for (const [event, handler] of listeners) {
-          el.removeEventListener(event, handler);
-        }
-        this.eventListeners.delete(el);
-      }
     }
   }
 
@@ -1976,7 +1937,7 @@
 
         if (completionListener) {
           const done = completionListener.addAsyncTask();
-          this.bindingManager.addTrackedEventListener(el, event, () => {
+          el.addEventListener(event, () => {
             if (done) done();
           });
         }
@@ -2037,7 +1998,7 @@
       const key = vNode.directives['@file'];
       if (!key) return;
       if (el.tagName === 'INPUT' && el.type === 'file') {
-        this.bindingManager.addTrackedEventListener(el, 'change', (e) => {
+        el.addEventListener('change', (e) => {
           const file = el.files && el.files[0];
           if (!file) {
             AyishaNestedUtil.setNested(state, key, null);
@@ -2061,7 +2022,7 @@
       const key = vNode.directives['@files'];
       if (!key) return;
       if (el.tagName === 'INPUT' && el.type === 'file') {
-        this.bindingManager.addTrackedEventListener(el, 'change', (e) => {
+        el.addEventListener('change', (e) => {
           const files = el.files;
           if (!files || files.length === 0) {
             AyishaNestedUtil.setNested(state, key, []);
@@ -2167,7 +2128,7 @@
       switch (event) {
         case 'click':
           const done = completionListener ? completionListener.addAsyncTask() : null;
-          this.bindingManager.addTrackedEventListener(el, 'click', (e) => {
+          el.addEventListener('click', (e) => {
             const newText = this.evalExpr(expression, ctx, e);
             el.textContent = this.formatTextValue(newText);
             if (done) done();
@@ -2175,11 +2136,11 @@
           return true;
 
         case 'hover':
-          this.bindingManager.addTrackedEventListener(el, 'mouseover', (e) => {
+          el.addEventListener('mouseover', (e) => {
             const newText = this.evalExpr(expression, ctx, e);
             el.textContent = this.formatTextValue(newText);
           });
-          this.bindingManager.addTrackedEventListener(el, 'mouseout', () => {
+          el.addEventListener('mouseout', () => {
             el.textContent = el._ayishaOriginalText;
           });
           return true;
@@ -2188,7 +2149,7 @@
         case 'focus':
         case 'blur':
           const asyncDone = completionListener ? completionListener.addAsyncTask() : null;
-          this.bindingManager.addTrackedEventListener(el, event, (e) => {
+          el.addEventListener(event, (e) => {
             const newText = this.evalExpr(expression, ctx, e);
             el.textContent = this.formatTextValue(newText);
             if (asyncDone) asyncDone();
@@ -2263,13 +2224,13 @@
 
       switch (event) {
         case 'hover':
-          this.bindingManager.addTrackedEventListener(el, 'mouseover', () => {
+          el.addEventListener('mouseover', () => {
             const clsMap = getClassMap();
             Object.entries(clsMap).forEach(([cls, cond]) => {
               if (cond) el.classList.add(cls);
             });
           });
-          this.bindingManager.addTrackedEventListener(el, 'mouseout', () => {
+          el.addEventListener('mouseout', () => {
             const clsMap = getClassMap();
             Object.entries(clsMap).forEach(([cls, cond]) => {
               if (cond) el.classList.remove(cls);
@@ -2278,13 +2239,13 @@
           return true;
 
         case 'focus':
-          this.bindingManager.addTrackedEventListener(el, 'focus', () => {
+          el.addEventListener('focus', () => {
             const clsMap = getClassMap();
             Object.entries(clsMap).forEach(([cls, cond]) => {
               if (cond) el.classList.add(cls);
             });
           });
-          this.bindingManager.addTrackedEventListener(el, 'blur', () => {
+          el.addEventListener('blur', () => {
             const clsMap = getClassMap();
             Object.entries(clsMap).forEach(([cls, cond]) => {
               if (cond) el.classList.remove(cls);
@@ -2294,7 +2255,7 @@
 
         case 'click':
           const done = completionListener ? completionListener.addAsyncTask() : null;
-          this.bindingManager.addTrackedEventListener(el, 'click', () => {
+          el.addEventListener('click', () => {
             const clsMap = getClassMap();
             Object.entries(clsMap).forEach(([cls, cond]) => {
               if (cond) el.classList.toggle(cls);
@@ -2305,14 +2266,14 @@
 
         case 'input':
           const asyncDone = completionListener ? completionListener.addAsyncTask() : null;
-          this.bindingManager.addTrackedEventListener(el, 'input', () => {
+          el.addEventListener('input', () => {
             const clsMap = getClassMap();
             Object.entries(clsMap).forEach(([cls, cond]) => {
               if (cond) el.classList.add(cls);
             });
             if (asyncDone) asyncDone();
           });
-          this.bindingManager.addTrackedEventListener(el, 'blur', () => {
+          el.addEventListener('blur', () => {
             const clsMap = getClassMap();
             Object.entries(clsMap).forEach(([cls, cond]) => {
               if (cond) el.classList.remove(cls);
@@ -2361,7 +2322,7 @@
 
       const done = completionListener ? completionListener.addAsyncTask() : null;
 
-      this.bindingManager.addTrackedEventListener(el, 'click', (e) => {
+      el.addEventListener('click', (e) => {
         this.handleClick(e, expr, ctx, state, el);
         if (done) done();
       });
@@ -2550,7 +2511,7 @@
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'click') {
         const done = completionListener ? completionListener.addAsyncTask() : null;
-        this.bindingManager.addTrackedEventListener(el, 'click', (e) => {
+        el.addEventListener('click', (e) => {
           this.handleClick(e, expression, ctx, state, el);
           if (done) done();
         });
@@ -2573,7 +2534,7 @@
 
       const done = completionListener ? completionListener.addAsyncTask() : null;
 
-      this.bindingManager.addTrackedEventListener(el, 'click', (e) => {
+      el.addEventListener('click', (e) => {
         try {
           let currentValue = this.evalExpr(processedExpr, ctx);
           currentValue = !!currentValue; 
@@ -2590,7 +2551,7 @@
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (event === 'click') {
         const done = completionListener ? completionListener.addAsyncTask() : null;
-        this.bindingManager.addTrackedEventListener(el, 'click', (e) => {
+        el.addEventListener('click', (e) => {
           try {
             let currentValue = this.evalExpr(expression, ctx);
             currentValue = !!currentValue; 
@@ -2647,7 +2608,7 @@
 
       const done = completionListener ? completionListener.addAsyncTask() : null;
 
-      this.bindingManager.addTrackedEventListener(el, eventName, (e) => {
+      el.addEventListener(eventName, (e) => {
         const resultVar = vNode.directives['@result'] || 'result';
         const ctxWithVNode = Object.assign({}, ctx, { _vNode: vNode });
 
@@ -2920,7 +2881,7 @@
 
       const done = completionListener ? completionListener.addAsyncTask() : null;
 
-      this.bindingManager.addTrackedEventListener(el, 'focus', (e) => {
+      el.addEventListener('focus', (e) => {
         try {
           this.executeExpression(expr, ctx, e, true);
           if (done) done();
@@ -2937,7 +2898,7 @@
           this.evaluator.ensureVarInState(expression);
         }
         const done = completionListener ? completionListener.addAsyncTask() : null;
-        this.bindingManager.addTrackedEventListener(el, 'focus', (e) => {
+        el.addEventListener('focus', (e) => {
           try {
             this.executeExpression(expression, ctx, e, true);
             if (done) done();
@@ -2963,7 +2924,7 @@
 
       const done = completionListener ? completionListener.addAsyncTask() : null;
 
-      this.bindingManager.addTrackedEventListener(el, 'blur', (e) => {
+      el.addEventListener('blur', (e) => {
         try {
           this.executeExpression(expr, ctx, e, true);
           if (done) done();
@@ -2980,7 +2941,7 @@
           this.evaluator.ensureVarInState(expression);
         }
         const done = completionListener ? completionListener.addAsyncTask() : null;
-        this.bindingManager.addTrackedEventListener(el, 'blur', (e) => {
+        el.addEventListener('blur', (e) => {
           try {
             this.executeExpression(expression, ctx, e, true);
             if (done) done();
@@ -3006,7 +2967,7 @@
 
       const done = completionListener ? completionListener.addAsyncTask() : null;
 
-      this.bindingManager.addTrackedEventListener(el, 'change', (e) => {
+      el.addEventListener('change', (e) => {
         try {
           this.executeExpression(expr, ctx, e, true);
           if (done) done();
@@ -3023,7 +2984,7 @@
           this.evaluator.ensureVarInState(expression);
         }
         const done = completionListener ? completionListener.addAsyncTask() : null;
-        this.bindingManager.addTrackedEventListener(el, 'change', (e) => {
+        el.addEventListener('change', (e) => {
           try {
             this.executeExpression(expression, ctx, e, true);
             if (done) done();
@@ -3049,7 +3010,7 @@
 
       const done = completionListener ? completionListener.addAsyncTask() : null;
 
-      this.bindingManager.addTrackedEventListener(el, 'input', (e) => {
+      el.addEventListener('input', (e) => {
         try {
           this.executeExpression(expr, ctx, e, true);
           if (done) done();
@@ -3066,7 +3027,7 @@
           this.evaluator.ensureVarInState(expression);
         }
         const done = completionListener ? completionListener.addAsyncTask() : null;
-        this.bindingManager.addTrackedEventListener(el, 'input', (e) => {
+        el.addEventListener('input', (e) => {
           try {
             this.executeExpression(expression, ctx, e, true);
             if (done) done();
@@ -3318,7 +3279,7 @@
     handleSubDirective(vNode, ctx, state, el, event, expression, completionListener = null) {
       if (['click', 'input', 'change', 'focus', 'blur'].includes(event)) {
         const done = completionListener ? completionListener.addAsyncTask() : null;
-        this.bindingManager.addTrackedEventListener(el, event, () => {
+        el.addEventListener(event, () => {
           try {
             this.executeExpression(expression, ctx, null, true);
             if (done) done();
@@ -3606,7 +3567,7 @@
     apply(vNode, ctx, state, el, completionListener = null) {
       if (el && vNode.directives['@link']) {
         const done = completionListener ? completionListener.addAsyncTask() : null;
-        this.bindingManager.addTrackedEventListener(el, 'click', e => {
+        el.addEventListener('click', e => {
           e.preventDefault();
           const targetPage = vNode.directives['@link'];
 
@@ -4935,7 +4896,7 @@
 
       const el = document.createElement(vNode.tag);
       if (vNode.tag === 'form') {
-        this.bindingManager.addTrackedEventListener(el, 'submit', function (e) {
+        el.addEventListener('submit', function (e) {
           e.preventDefault();
         });
       }
@@ -5305,7 +5266,7 @@
             if (clickLogger) {
               this.centralLogger.clickLoggers.set(el, clickLogger);
 
-              this.bindingManager.addTrackedEventListener(el, 'click', () => {
+              el.addEventListener('click', () => {
                 clickLogger.recordClick();
                 this.centralLogger.addLog(elementInfo, vNode, ctx, this.state, el);
               });
